@@ -505,7 +505,14 @@
     if (nameEl && firstName) nameEl.textContent = ', ' + firstName;
 
     var btn = $('#download-btn');
-    var href = safeUrl(downloadUrl) || safeUrl(CFG.EBOOK_URL) || '';
+
+    // The PDF that ships with the page wins. It is known to exist and is
+    // same-origin, so the download attribute actually works; a URL handed back
+    // by the workflow is remote config that can drift out of date, and if it is
+    // cross-origin the browser opens a tab instead of saving the file.
+    // To serve signed or expiring links from the workflow instead, clear
+    // EBOOK_URL in config.js and let downloadUrl take over.
+    var href = safeUrl(CFG.EBOOK_URL) || safeUrl(downloadUrl) || '';
     if (btn) {
       if (href) {
         btn.href = href;

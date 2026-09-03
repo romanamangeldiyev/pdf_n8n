@@ -135,9 +135,10 @@ works for guide leads.
 > `⚙️ Admin URL` is marked *required* on this list. In ClickUp that only blocks closing a task,
 > not creating one, so new rows arrive fine with it empty.
 
-> `Respond 200` answers with a bare `{"ok": true}`, so the page serves the PDF from its own
-> `EBOOK_URL`. Add `downloadUrl` to that response only if you move to signed or expiring links —
-> and note that a cross-origin URL opens in a new tab instead of downloading.
+> `Respond 200` answers with a bare `{"ok": true}` and the page serves the PDF from its own
+> `EBOOK_URL`, which takes priority. To hand out signed or expiring links from the workflow
+> instead, clear `EBOOK_URL` and return `downloadUrl` — note that a cross-origin URL opens in a
+> new tab rather than downloading.
 
 ### What the page sends
 
@@ -170,8 +171,8 @@ URL, so campaign attribution arrives with the lead.
 | Response | Page behaviour |
 |---|---|
 | `200` + `{"ok":true}` ← what the workflow sends | success panel, download button uses `EBOOK_URL` |
-| `200` + `{"ok":true,"downloadUrl":"…"}` | success panel, download button uses `downloadUrl` instead |
 | `200` + empty body | success panel, download button uses `EBOOK_URL` |
+| `200` + `{"ok":true,"downloadUrl":"…"}` | `EBOOK_URL` still wins; `downloadUrl` is used only when `EBOOK_URL` is empty |
 | `200` + `{"ok":false,"message":"…"}` | error banner, form stays filled in |
 | any `4xx` / `5xx`, timeout, or network failure | error banner, form stays filled in |
 
