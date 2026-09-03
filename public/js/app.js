@@ -1,8 +1,10 @@
 /* ==========================================================================
-   Car Studio lead form
-   - progressive enhancement: the form works with plain native selects if this
-     file fails to load; touch devices keep the native picker on purpose
-   - client-side validation, then a JSON POST to the n8n webhook
+   Car Studio — gated guide
+   - renders the PDF into the page with pdf.js (an <iframe> shows only page one
+     on iOS Safari, and mobile Chrome sometimes downloads instead of rendering)
+   - the form is a modal over it; the guide is blurred until the form is sent
+   - progressive enhancement: without JS the form still renders with native
+     selects, and the headline stands in for the unrendered PDF
    ========================================================================== */
 
 (function () {
@@ -10,26 +12,279 @@
 
   var CFG = window.CS_CONFIG || {};
   var doc = document;
-  var $  = function (sel, root) { return (root || doc).querySelector(sel); };
-  var $$ = function (sel, root) { return Array.prototype.slice.call((root || doc).querySelectorAll(sel)); };
+  var root = doc.documentElement;
+  var $  = function (sel, r) { return (r || doc).querySelector(sel); };
+  var $$ = function (sel, r) { return Array.prototype.slice.call((r || doc).querySelectorAll(sel)); };
 
-  var form         = $('#lead-form');
-  var formPanel    = $('#form-panel');
-  var successPanel = $('#success-panel');
-  var alertBox     = $('#form-alert');
-  var submitBtn    = $('#submit-btn');
-  var yearEl       = $('#year');
+  var form       = $('#lead-form');
+  var modalLayer = $('#modal-layer');
+  var modal      = $('#modal');
+  var alertBox   = $('#form-alert');
+  var submitBtn  = $('#submit-btn');
+  var postbar    = $('#postbar');
 
-  if (yearEl) yearEl.textContent = String(new Date().getFullYear());
-  if (!form) return;
-
-  var startedAt   = Date.now();
-  var submitting  = false;
+  var startedAt    = Date.now();
+  var submitting   = false;
   var wasSubmitted = false;
+
+  /* ================================================================= urls == */
+
+  function isSameOrigin(url) {
+    try { return new URL(url, window.location.href).origin === window.location.origin; }
+    catch (e) { return false; }
+  }
+
+  // Anything that ends up in an href or a fetch must be a real http(s) URL —
+  // never javascript:, data: or anything exotic.
+  function safeUrl(url) {
+    if (!url || typeof url !== 'string' || !url.trim()) return '';
+    try {
+      var u = new URL(url.trim(), window.location.href);
+      return (u.protocol === 'https:' || u.protocol === 'http:') ? u.href : '';
+    } catch (e) { return ''; }
+  }
+
+  /* ================================================================== pdf == */
+
+  var pdfState = { doc: null, width: 0, rendering: false };
+
+  function showPdfFallback() {
+    var fb = $('#viewer-fallback');
+    if (fb) fb.hidden = false;
+  }
+
+  function renderPdf() {
+    var url = safeUrl(CFG.EBOOK_URL);
+    var host = $('#viewer-pages');
+    if (!host) return;
+
+    if (!url || !window.pdfjsLib) {
+      // No pdf.js (CDN blocked, offline) — the form must still work.
+      showPdfFallback();
+      return;
+    }
+
+    try {
+      if (CFG.PDFJS_WORKER) {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = CFG.PDFJS_WORKER;
+      }
+    } catch (e) { /* older builds ignore this */ }
+
+    // pdf.js can hang rather than fail — a blocked worker, a stalled CDN, a
+    // proxy that swallows the range requests. Without a deadline the visitor
+    // stares at an empty frame behind the form, so fall back to the headline.
+    var settled = false;
+    var deadline = setTimeout(function () {
+      if (settled) return;
+      settled = true;
+      console.warn('[car-studio] the guide did not render in time; showing the fallback');
+      showPdfFallback();
+    }, CFG.PDF_TIMEOUT_MS || 12000);
+
+    window.pdfjsLib.getDocument(url).promise
+      .then(function (pdf) {
+        pdfState.doc = pdf;
+        return paintPages();
+      })
+      .then(function () { settled = true; clearTimeout(deadline); })
+      .catch(function (err) {
+        settled = true;
+        clearTimeout(deadline);
+        console.error('[car-studio] could not render the guide:', err);
+        showPdfFallback();
+      });
+  }
+
+  function paintPages() {
+    var pdf = pdfState.doc;
+    var host = $('#viewer-pages');
+    var viewer = $('#viewer');
+    if (!pdf || !host || pdfState.rendering) return Promise.resolve();
+
+    pdfState.rendering = true;
+    var cssWidth = Math.max(280, Math.min(900, (viewer.clientWidth || 900) - 32));
+    pdfState.width = cssWidth;
+    // Cap the pixel ratio: 3x on a phone triples memory for no visible gain.
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    host.textContent = '';
+    var fb = $('#viewer-fallback');
+    if (fb) fb.hidden = true;
+
+    var chain = Promise.resolve();
+    for (var i = 1; i <= pdf.numPages; i++) {
+      chain = chain.then(paintOne(i, cssWidth, dpr, host));
+    }
+    return chain
+      .catch(function (err) {
+        console.error('[car-studio] page render failed:', err);
+        if (!host.childNodes.length) showPdfFallback();
+      })
+      .then(function () { pdfState.rendering = false; });
+  }
+
+  function paintOne(pageNo, cssWidth, dpr, host) {
+    return function () {
+      return pdfState.doc.getPage(pageNo).then(function (page) {
+        var base = page.getViewport({ scale: 1 });
+        var scale = cssWidth / base.width;
+        var viewport = page.getViewport({ scale: scale * dpr });
+
+        var canvas = doc.createElement('canvas');
+        canvas.width = Math.floor(viewport.width);
+        canvas.height = Math.floor(viewport.height);
+        canvas.style.aspectRatio = base.width + ' / ' + base.height;
+        canvas.setAttribute('aria-hidden', 'true');
+        host.appendChild(canvas);
+
+        return page.render({
+          canvasContext: canvas.getContext('2d', { alpha: false }),
+          viewport: viewport
+        }).promise;
+      });
+    };
+  }
+
+  // Re-render when the width changes materially (rotation, window resize).
+  var resizeTimer = null;
+  window.addEventListener('resize', function () {
+    if (!pdfState.doc) return;
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function () {
+      var viewer = $('#viewer');
+      var next = Math.max(280, Math.min(900, (viewer.clientWidth || 900) - 32));
+      if (Math.abs(next - pdfState.width) > 40) paintPages();
+    }, 250);
+  });
+
+  /* ================================================== modal / focus trap == */
+
+  var FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),' +
+                  'select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+
+  function focusablesInModal() {
+    return $$(FOCUSABLE, modal).filter(function (el) {
+      return el.offsetWidth > 0 || el.offsetHeight > 0 || el === doc.activeElement;
+    });
+  }
+
+  // The gate has no dismiss affordance on purpose, so focus must not be able to
+  // wander out to the page behind it.
+  function trapFocus(e) {
+    if (e.key !== 'Tab' || !root.classList.contains('gated')) return;
+    var items = focusablesInModal();
+    if (!items.length) return;
+    var first = items[0], last = items[items.length - 1];
+    if (e.shiftKey && doc.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && doc.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
+
+  doc.addEventListener('keydown', trapFocus);
+
+  // If focus escapes some other way (a click on the backdrop), pull it back.
+  doc.addEventListener('focusin', function (e) {
+    if (!root.classList.contains('gated')) return;
+    if (modal.contains(e.target)) return;
+    var items = focusablesInModal();
+    if (items.length) items[0].focus();
+  });
+
+  function unlockGuide(firstName, downloadUrl) {
+    // 1. the modal leaves
+    modalLayer.classList.add('is-leaving');
+    setTimeout(function () {
+      modalLayer.hidden = true;
+      modalLayer.classList.remove('is-leaving');
+    }, 320);
+
+    // 2. blur and veil lift, scrolling is released
+    root.classList.remove('gated');
+
+    var pages = $('#viewer-pages');
+    if (pages) {
+      pages.setAttribute('aria-label',
+        'The guide, rendered as images. Use the Download PDF button to read it with a screen reader.');
+    }
+
+    // 3. the confirmation bar takes over
+    var nameEl = $('#success-name');
+    if (nameEl && firstName) nameEl.textContent = ', ' + firstName;
+
+    // The PDF that ships with the page wins: it is known to exist and is
+    // same-origin, so the download attribute actually works. A URL handed back
+    // by the workflow is remote config that can drift out of date, and if it is
+    // cross-origin the browser opens a tab instead of saving the file. Clear
+    // EBOOK_URL in config.js to let the workflow supply signed links instead.
+    var btn = $('#download-btn');
+    var href = safeUrl(CFG.EBOOK_URL) || safeUrl(downloadUrl) || '';
+    if (btn) {
+      if (href) {
+        btn.href = href;
+        if (isSameOrigin(href)) {
+          btn.setAttribute('download', CFG.EBOOK_FILENAME || '');
+          btn.removeAttribute('target');
+          btn.removeAttribute('rel');
+        } else {
+          btn.removeAttribute('download');
+          btn.target = '_blank';
+          btn.rel = 'noopener noreferrer';
+        }
+      } else {
+        btn.hidden = true;
+      }
+    }
+
+    postbar.hidden = false;
+    var focusTarget = (btn && !btn.hidden) ? btn : $('#postbar-close');
+    if (focusTarget) focusTarget.focus();
+
+    if (typeof window.dataLayer !== 'undefined' && window.dataLayer.push) {
+      window.dataLayer.push({ event: 'generate_lead', form_id: 'car-studio-guide-v1' });
+    }
+  }
+
+  var postbarClose = $('#postbar-close');
+  if (postbarClose) {
+    postbarClose.addEventListener('click', function () {
+      postbar.hidden = true;
+      var viewer = $('#viewer');
+      if (viewer) viewer.focus();
+    });
+  }
+
+  /* ============================================================ dial codes = */
+
+  function buildDialCodes() {
+    var sel = $('#dialCode');
+    if (!sel) return;
+    var list = CFG.DIAL_CODES || [];
+    var def = CFG.DEFAULT_COUNTRY || 'TR';
+
+    list.forEach(function (c) {
+      var o = doc.createElement('option');
+      o.value = c.iso;
+      // Code first: on the touch path this select is narrow, and if the text has
+      // to clip it must be the country name that goes, never the dial code.
+      o.textContent = c.dial + ' ' + c.name;
+      o.dataset.dial = c.dial;
+      o.dataset.short = c.dial;
+      o.dataset.name = c.name;
+      if (c.iso === def) o.selected = true;
+      sel.appendChild(o);
+    });
+    if (!sel.value && sel.options.length) sel.selectedIndex = 0;
+  }
+
+  function currentDial() {
+    var sel = $('#dialCode');
+    if (!sel) return '';
+    var opt = sel.options[sel.selectedIndex];
+    return (opt && opt.dataset.dial) || '';
+  }
 
   /* ======================================================= custom select == */
 
-  var USE_NATIVE_SELECTS = doc.documentElement.classList.contains('native-select');
+  var USE_NATIVE_SELECTS = root.classList.contains('native-select');
 
   function CustomSelect(wrap) {
     var native = $('select[data-native]', wrap);
@@ -37,12 +292,12 @@
     // hiding a select that has no replacement.
     if (!native || !native.id) { wrap.classList.add('is-native'); return; }
 
-    this.wrap    = wrap;
-    this.native  = native;
-    this.id      = native.id;
-    this.open    = false;
-    this.active  = -1;
-    this.typed   = '';
+    this.wrap = wrap;
+    this.native = native;
+    this.id = native.id;
+    this.open = false;
+    this.active = -1;
+    this.typed = '';
     this.typedAt = 0;
 
     this.label = $('label[for="' + CSS.escape(this.id) + '"]');
@@ -53,9 +308,9 @@
     this.syncFromNative();
 
     // The native select stays in the DOM to carry the value, but it must not be
-    // reachable: hidden with opacity/clip it would still take a Tab stop (with no
-    // visible focus ring) and be announced as a second combobox for the same field.
-    // tabIndex -1 first, so aria-hidden is never applied to a focusable element.
+    // reachable: hidden with opacity/clip it would still take a Tab stop (with
+    // no visible focus ring) and be announced as a second combobox for the same
+    // field. tabIndex -1 first, so aria-hidden never lands on a focusable node.
     native.tabIndex = -1;
     native.setAttribute('aria-hidden', 'true');
 
@@ -212,7 +467,7 @@
     var o = this.options[i];
     if (!o) return;
     this.native.value = o.value;
-    this.native.dispatchEvent(new Event('input',  { bubbles: true }));
+    this.native.dispatchEvent(new Event('input', { bubbles: true }));
     this.native.dispatchEvent(new Event('change', { bubbles: true }));
     this.syncFromNative();
     this.closeList();
@@ -296,36 +551,6 @@
     window.addEventListener('resize', function () { self.position(); });
     window.addEventListener('orientationchange', function () { self.closeList(); });
   };
-
-  /* ============================================================ dial codes = */
-
-  function buildDialCodes() {
-    var sel = $('#dialCode');
-    if (!sel) return;
-    var list = CFG.DIAL_CODES || [];
-    var def  = CFG.DEFAULT_COUNTRY || 'TR';
-
-    list.forEach(function (c) {
-      var o = doc.createElement('option');
-      o.value = c.iso;
-      // Code first: on the touch path this select is narrow, and if the text has
-      // to clip it must be the country name that goes, never the dial code.
-      o.textContent = c.dial + ' ' + c.name;
-      o.dataset.dial  = c.dial;
-      o.dataset.short = c.dial;
-      o.dataset.name  = c.name;
-      if (c.iso === def) o.selected = true;
-      sel.appendChild(o);
-    });
-    if (!sel.value && sel.options.length) sel.selectedIndex = 0;
-  }
-
-  function currentDial() {
-    var sel = $('#dialCode');
-    if (!sel) return '';
-    var opt = sel.options[sel.selectedIndex];
-    return (opt && opt.dataset.dial) || '';
-  }
 
   /* ============================================================ validation = */
 
@@ -485,61 +710,7 @@
     if (msg) alertBox.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
 
-  function isSameOrigin(url) {
-    try { return new URL(url, window.location.href).origin === window.location.origin; }
-    catch (e) { return false; }
-  }
-
-  // The response comes from n8n, but it still ends up in an href — only let
-  // real http(s) URLs through, never javascript:, data: or anything exotic.
-  function safeUrl(url) {
-    if (!url || typeof url !== 'string' || !url.trim()) return '';
-    try {
-      var u = new URL(url.trim(), window.location.href);
-      return (u.protocol === 'https:' || u.protocol === 'http:') ? u.href : '';
-    } catch (e) { return ''; }
-  }
-
-  function showSuccess(downloadUrl, firstName) {
-    var nameEl = $('#success-name');
-    if (nameEl && firstName) nameEl.textContent = ', ' + firstName;
-
-    var btn = $('#download-btn');
-
-    // The PDF that ships with the page wins. It is known to exist and is
-    // same-origin, so the download attribute actually works; a URL handed back
-    // by the workflow is remote config that can drift out of date, and if it is
-    // cross-origin the browser opens a tab instead of saving the file.
-    // To serve signed or expiring links from the workflow instead, clear
-    // EBOOK_URL in config.js and let downloadUrl take over.
-    var href = safeUrl(CFG.EBOOK_URL) || safeUrl(downloadUrl) || '';
-    if (btn) {
-      if (href) {
-        btn.href = href;
-        if (isSameOrigin(href)) {
-          btn.setAttribute('download', CFG.EBOOK_FILENAME || '');
-          btn.removeAttribute('target');
-          btn.removeAttribute('rel');
-        } else {
-          btn.removeAttribute('download');
-          btn.target = '_blank';
-          btn.rel = 'noopener noreferrer';
-        }
-      } else {
-        btn.hidden = true;
-      }
-    }
-
-    formPanel.hidden = true;
-    successPanel.hidden = false;
-    successPanel.focus();
-
-    if (typeof window.dataLayer !== 'undefined' && window.dataLayer.push) {
-      window.dataLayer.push({ event: 'generate_lead', form_id: 'car-studio-guide-v1' });
-    }
-  }
-
-  form.addEventListener('submit', function (e) {
+  if (form) form.addEventListener('submit', function (e) {
     e.preventDefault();
     if (submitting) return;
     wasSubmitted = true;
@@ -555,7 +726,7 @@
 
     // honeypot — a real person never sees this field
     var hp = form.elements.companyWebsite;
-    if (hp && hp.value) { showSuccess(null, val('firstName')); return; }
+    if (hp && hp.value) { unlockGuide(val('firstName'), null); return; }
 
     var payload = buildPayload();
     if (payload.meta.fillMs < (CFG.MIN_FILL_MS || 0)) payload.meta.suspiciouslyFast = true;
@@ -593,7 +764,7 @@
       })
       .then(function (data) {
         if (data && data.ok === false) throw new Error(data.message || 'Rejected');
-        showSuccess(data && data.downloadUrl, payload.firstName);
+        unlockGuide(payload.firstName, data && data.downloadUrl);
       })
       .catch(function (err) {
         console.error('[car-studio] submit failed:', err);
@@ -604,18 +775,20 @@
   });
 
   // re-validate a field once the user has already tried to submit
-  form.addEventListener('input', function (e) {
-    if (!wasSubmitted || !e.target.name || !RULES[e.target.name]) return;
-    if (fieldOf(e.target) && fieldOf(e.target).classList.contains('is-invalid')) validateField(e.target);
-  });
-  form.addEventListener('change', function (e) {
-    if (!wasSubmitted || !e.target.name || !RULES[e.target.name]) return;
-    validateField(e.target);
-  });
-  form.addEventListener('blur', function (e) {
-    if (!wasSubmitted || !e.target.name || !RULES[e.target.name]) return;
-    validateField(e.target);
-  }, true);
+  if (form) {
+    form.addEventListener('input', function (e) {
+      if (!wasSubmitted || !e.target.name || !RULES[e.target.name]) return;
+      if (fieldOf(e.target) && fieldOf(e.target).classList.contains('is-invalid')) validateField(e.target);
+    });
+    form.addEventListener('change', function (e) {
+      if (!wasSubmitted || !e.target.name || !RULES[e.target.name]) return;
+      validateField(e.target);
+    });
+    form.addEventListener('blur', function (e) {
+      if (!wasSubmitted || !e.target.name || !RULES[e.target.name]) return;
+      validateField(e.target);
+    }, true);
+  }
 
   /* ================================================================== init = */
 
@@ -630,4 +803,9 @@
       }
     });
   }
+
+  renderPdf();
+
+  var firstField = $('#firstName');
+  if (firstField) firstField.focus({ preventScroll: true });
 })();

@@ -29,6 +29,7 @@
   (function (d) {
     var c = d.documentElement.classList;
     c.add('js');
+    c.add('gated');          /* the guide starts behind the form */
     try {
       if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) c.add('native-select');
     } catch (e) {}
@@ -37,185 +38,150 @@
 </head>
 <body>
 
-<a class="skip-link" href="#lead-form">Skip to the form</a>
+<h1 class="sr-only">How to sell your used cars faster — a free guide for used car dealerships</h1>
 
-<div class="page">
+<!-- The guide itself, rendered page by page. Blurred until the form is sent. -->
+<div class="viewer" id="viewer">
+  <div class="viewer-pages" id="viewer-pages" role="img"
+       aria-label="Preview of the guide, blurred until you request it"></div>
+  <p class="viewer-fallback" id="viewer-fallback">
+    <span>How to sell your used cars faster</span>
+    <em>The five factors that decide whether a car sells</em>
+  </p>
+</div>
+<div class="veil" id="veil" aria-hidden="true"></div>
 
-  <header class="site-header">
-    <a class="logo" href="https://carstudio.ai" aria-label="Car Studio — home">
-      <img src="img/logo.png" width="600" height="97" alt="Car Studio" decoding="async">
-    </a>
-    <a class="site-link" href="https://carstudio.ai">carstudio.ai</a>
-  </header>
+<header class="site-header">
+  <a class="logo" href="https://carstudio.ai" aria-label="Car Studio — home">
+    <img src="img/logo.png" width="600" height="97" alt="Car Studio" decoding="async">
+  </a>
+  <a class="site-link" href="https://carstudio.ai">carstudio.ai</a>
+</header>
 
-  <main class="layout">
+<!-- ── The gate ─────────────────────────────────────────────────────────── -->
+<div class="modal-layer" id="modal-layer">
+  <section class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="form-title">
 
-    <!-- Left column: the pitch -->
-    <section class="pitch">
-      <p class="badge">FREE GUIDE</p>
+    <h2 class="card-title" id="form-title">Get the guide</h2>
+    <p class="card-sub">Fill this in and you&rsquo;ll see the E-Book right away.</p>
 
-      <h1 class="headline">How to sell your used<br class="br-desktop"> cars faster</h1>
+    <div class="alert" id="form-alert" role="alert" hidden></div>
 
-      <p class="subhead">
-        A short guide for used car dealerships. What decides whether a car sells,
-        and what to change in each.
-      </p>
+    <form id="lead-form" novalidate>
 
-      <h2 class="eyebrow">The five factors</h2>
-
-      <ol class="factors">
-        <li class="factor"><span class="factor-no">01</span><span class="factor-name">Price</span></li>
-        <li class="factor"><span class="factor-no">02</span><span class="factor-name">Preparation</span></li>
-        <li class="factor"><span class="factor-no">03</span><span class="factor-name">Where you advertise</span></li>
-        <li class="factor"><span class="factor-no">04</span><span class="factor-name">What the listing says</span></li>
-        <li class="factor"><span class="factor-no">05</span><span class="factor-name">What the listing shows</span></li>
-      </ol>
-    </section>
-
-    <!-- Right column: the form -->
-    <section class="card" aria-labelledby="form-title">
-
-      <div class="card-body" id="form-panel">
-        <h2 class="card-title" id="form-title">Get the guide</h2>
-        <p class="card-sub">Fill this in and you&rsquo;ll see the E-Book right away.</p>
-
-        <div class="alert" id="form-alert" role="alert" hidden></div>
-
-        <form id="lead-form" novalidate>
-
-          <div class="row row-2">
-            <div class="field">
-              <label for="firstName">First name <span class="req" aria-hidden="true">*</span></label>
-              <input id="firstName" name="firstName" type="text" autocomplete="given-name"
-                     placeholder="Jane" required maxlength="60"
-                     aria-describedby="firstName-err">
-              <p class="err" id="firstName-err" hidden></p>
-            </div>
-
-            <div class="field">
-              <label for="lastName">Last name <span class="req" aria-hidden="true">*</span></label>
-              <input id="lastName" name="lastName" type="text" autocomplete="family-name"
-                     placeholder="Doe" required maxlength="60"
-                     aria-describedby="lastName-err">
-              <p class="err" id="lastName-err" hidden></p>
-            </div>
-          </div>
-
-          <div class="field">
-            <label for="email">Email <span class="req" aria-hidden="true">*</span></label>
-            <input id="email" name="email" type="email" autocomplete="email" inputmode="email"
-                   placeholder="jane@dealership.com" required maxlength="254"
-                   aria-describedby="email-err">
-            <p class="err" id="email-err" hidden></p>
-          </div>
-
-          <div class="field">
-            <label for="company">Company <span class="req" aria-hidden="true">*</span></label>
-            <input id="company" name="company" type="text" autocomplete="organization"
-                   placeholder="Company name" required maxlength="120"
-                   aria-describedby="company-err">
-            <p class="err" id="company-err" hidden></p>
-          </div>
-
-          <div class="field">
-            <label for="phone">Phone number</label>
-            <div class="phone">
-              <div class="select-wrap select-dial" data-select>
-                <label class="sr-only" for="dialCode">Country calling code</label>
-                <select id="dialCode" name="dialCode" data-native></select>
-              </div>
-              <input id="phone" name="phone" type="tel" autocomplete="tel-national" inputmode="tel"
-                     placeholder="532 000 00 00" maxlength="24"
-                     aria-describedby="phone-err">
-            </div>
-            <p class="err" id="phone-err" hidden></p>
-          </div>
-
-          <div class="field">
-            <label for="businessType">Business type <span class="req" aria-hidden="true">*</span></label>
-            <div class="select-wrap" data-select>
-              <select id="businessType" name="businessType" required data-native
-                      data-placeholder="Select business type" aria-describedby="businessType-err">
-                <option value="">Select business type</option>
-                <option value="OEM / Manufacturer">OEM / Manufacturer</option>
-                <option value="Dealership">Dealership</option>
-                <option value="Dealer Group">Dealer Group</option>
-                <option value="Marketplace">Marketplace</option>
-              </select>
-            </div>
-            <p class="err" id="businessType-err" hidden></p>
-          </div>
-
-          <div class="field">
-            <label for="heardFrom">How did you hear about us?</label>
-            <div class="select-wrap" data-select>
-              <select id="heardFrom" name="heardFrom" data-native
-                      data-placeholder="Please select" aria-describedby="heardFrom-err">
-                <option value="">Please select</option>
-                <option value="Search Engine">Search Engine (Google, Bing, Yandex etc.)</option>
-                <option value="Email">Email</option>
-                <option value="Generative AI">Generative AI (ChatGPT, Claude, Gemini etc.)</option>
-                <option value="LinkedIn">LinkedIn</option>
-                <option value="Instagram">Instagram</option>
-                <option value="Referral">Referral</option>
-                <option value="Ads">Ads</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
-            <p class="err" id="heardFrom-err" hidden></p>
-          </div>
-
-          <!-- honeypot: hidden from humans, not focusable, ignored by autofill -->
-          <div class="hp" aria-hidden="true">
-            <label for="companyWebsite">Company website</label>
-            <input id="companyWebsite" name="companyWebsite" type="text" tabindex="-1" autocomplete="off">
-          </div>
-
-          <button class="submit" type="submit" id="submit-btn">
-            <span class="submit-label">Show me the guide</span>
-            <span class="spinner" aria-hidden="true"></span>
-          </button>
-
-          <p class="fineprint">
-            We&rsquo;ll email you a copy too. No spam &mdash; unsubscribe any time.
-            See our <a href="https://carstudio.ai/privacy-policy">Privacy Policy</a>.
-          </p>
-        </form>
-      </div>
-
-      <!-- success state -->
-      <div class="card-body success" id="success-panel" hidden tabindex="-1">
-        <div class="success-mark" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-               stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      <div class="row row-2">
+        <div class="field">
+          <label for="firstName">First name <span class="req" aria-hidden="true">*</span></label>
+          <input id="firstName" name="firstName" type="text" autocomplete="given-name"
+                 placeholder="Jane" required maxlength="60" aria-describedby="firstName-err">
+          <p class="err" id="firstName-err" hidden></p>
         </div>
-        <h2 class="card-title">Your guide is ready</h2>
-        <p class="card-sub">
-          Thanks<span id="success-name"></span> &mdash; the E-Book is below, and a copy is on its way to your inbox.
-        </p>
-        <a class="submit as-link" id="download-btn" href="#">
-          <span>Download the E-Book</span>
-        </a>
-        <p class="fineprint">
-          Didn&rsquo;t get the email? Check your spam folder, or write to
-          <a href="mailto:info@carstudio.ai">info@carstudio.ai</a>.
-        </p>
+
+        <div class="field">
+          <label for="lastName">Last name <span class="req" aria-hidden="true">*</span></label>
+          <input id="lastName" name="lastName" type="text" autocomplete="family-name"
+                 placeholder="Doe" required maxlength="60" aria-describedby="lastName-err">
+          <p class="err" id="lastName-err" hidden></p>
+        </div>
       </div>
 
-    </section>
-  </main>
+      <div class="field">
+        <label for="email">Email <span class="req" aria-hidden="true">*</span></label>
+        <input id="email" name="email" type="email" autocomplete="email" inputmode="email"
+               placeholder="jane@dealership.com" required maxlength="254" aria-describedby="email-err">
+        <p class="err" id="email-err" hidden></p>
+      </div>
 
-  <footer class="site-footer">
-    <p>&copy; <span id="year">2026</span> Car Studio AI</p>
-    <nav aria-label="Legal">
-      <a href="https://carstudio.ai/privacy-policy">Privacy</a>
-      <a href="https://carstudio.ai/terms">Terms</a>
-      <a href="mailto:info@carstudio.ai">info@carstudio.ai</a>
-    </nav>
-  </footer>
+      <div class="field">
+        <label for="company">Company <span class="req" aria-hidden="true">*</span></label>
+        <input id="company" name="company" type="text" autocomplete="organization"
+               placeholder="Company name" required maxlength="120" aria-describedby="company-err">
+        <p class="err" id="company-err" hidden></p>
+      </div>
 
+      <div class="field">
+        <label for="phone">Phone number</label>
+        <div class="phone">
+          <div class="select-wrap select-dial" data-select>
+            <label class="sr-only" for="dialCode">Country calling code</label>
+            <select id="dialCode" name="dialCode" data-native></select>
+          </div>
+          <input id="phone" name="phone" type="tel" autocomplete="tel-national" inputmode="tel"
+                 placeholder="532 000 00 00" maxlength="24" aria-describedby="phone-err">
+        </div>
+        <p class="err" id="phone-err" hidden></p>
+      </div>
+
+      <div class="field">
+        <label for="businessType">Business type <span class="req" aria-hidden="true">*</span></label>
+        <div class="select-wrap" data-select>
+          <select id="businessType" name="businessType" required data-native
+                  data-placeholder="Select business type" aria-describedby="businessType-err">
+            <option value="">Select business type</option>
+            <option value="OEM / Manufacturer">OEM / Manufacturer</option>
+            <option value="Dealership">Dealership</option>
+            <option value="Dealer Group">Dealer Group</option>
+            <option value="Marketplace">Marketplace</option>
+          </select>
+        </div>
+        <p class="err" id="businessType-err" hidden></p>
+      </div>
+
+      <div class="field">
+        <label for="heardFrom">How did you hear about us?</label>
+        <div class="select-wrap" data-select>
+          <select id="heardFrom" name="heardFrom" data-native
+                  data-placeholder="Please select" aria-describedby="heardFrom-err">
+            <option value="">Please select</option>
+            <option value="Search Engine">Search Engine (Google, Bing, Yandex etc.)</option>
+            <option value="Email">Email</option>
+            <option value="Generative AI">Generative AI (ChatGPT, Claude, Gemini etc.)</option>
+            <option value="LinkedIn">LinkedIn</option>
+            <option value="Instagram">Instagram</option>
+            <option value="Referral">Referral</option>
+            <option value="Ads">Ads</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <p class="err" id="heardFrom-err" hidden></p>
+      </div>
+
+      <!-- honeypot: hidden from humans, not focusable, ignored by autofill -->
+      <div class="hp" aria-hidden="true">
+        <label for="companyWebsite">Company website</label>
+        <input id="companyWebsite" name="companyWebsite" type="text" tabindex="-1" autocomplete="off">
+      </div>
+
+      <button class="submit" type="submit" id="submit-btn">
+        <span class="submit-label">Show me the guide</span>
+        <span class="spinner" aria-hidden="true"></span>
+      </button>
+
+      <p class="fineprint">
+        We&rsquo;ll email you a copy too. No spam &mdash; unsubscribe any time.
+        See our <a href="https://carstudio.ai/privacy-policy">Privacy Policy</a>.
+      </p>
+    </form>
+  </section>
 </div>
 
+<!-- ── Shown once the gate is passed ────────────────────────────────────── -->
+<div class="postbar" id="postbar" hidden>
+  <p class="postbar-text">
+    <span class="postbar-tick" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+           stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+    </span>
+    <span>Thanks<span id="success-name"></span> &mdash; the guide is yours. A copy is on its way to your inbox.</span>
+  </p>
+  <a class="postbar-btn" id="download-btn" href="#">Download PDF</a>
+  <button class="postbar-close" id="postbar-close" type="button" aria-label="Dismiss">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+  </button>
+</div>
+
+<script src="vendor/pdf.min.js"></script>
 <script src="js/config.js"></script>
 <script src="js/app.js"></script>
 </body>

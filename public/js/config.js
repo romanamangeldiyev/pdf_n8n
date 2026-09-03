@@ -28,6 +28,16 @@ window.CS_CONFIG = {
    * Cross-origin URLs ignore the download attribute — the file opens instead. */
   EBOOK_FILENAME: 'car-studio-how-to-sell-your-used-cars-faster.pdf',
 
+  /* pdf.js worker. It MUST be same-origin: browsers refuse to construct a
+   * Worker from another origin, and pdf.js then hangs instead of erroring —
+   * which is why both files are vendored into public/vendor/ (v3.11.174)
+   * rather than pulled from a CDN. Keep the two in the same version. */
+  PDFJS_WORKER: 'vendor/pdf.worker.min.js',
+
+  /* If the guide has not rendered by then, show the headline instead of an
+   * empty frame. */
+  PDF_TIMEOUT_MS: 12000,
+
   /* Give up on the request after this many milliseconds. */
   TIMEOUT_MS: 15000,
 

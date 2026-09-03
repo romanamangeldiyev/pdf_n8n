@@ -1,18 +1,21 @@
 # Car Studio — "How to sell your used cars faster" lead page
 
-A one-page lead magnet. Colours, type scale and layout were taken from the *Landing page* mock
-and the *Kurumsal Kimlik Kılavuzu 2023* brand guideline; the dropdowns follow the supplied
-screenshots. The form POSTs straight to an **n8n webhook**, which files the lead as a row in the
-ClickUp *Inbound Leads* table, then shows the E-Book download in place.
+A gated guide. The E-Book fills the screen, blurred, with the form on top of it as a modal;
+sending the form dissolves the modal and brings the guide into focus. Colours, type scale and
+layout were taken from the *Landing page* mock and the *Kurumsal Kimlik Kılavuzu 2023* brand
+guideline; the dropdowns follow the supplied screenshots. The form POSTs straight to an **n8n
+webhook**, which files the lead as a row in the ClickUp *Inbound Leads* table.
 
-Plain HTML, CSS and JavaScript — no build step, no dependencies.
+Plain HTML, CSS and JavaScript — no build step. The only dependency is pdf.js, vendored into
+`public/vendor/` rather than pulled from a CDN.
 
 ```
 public/                 ← the only folder that gets published
   index.html            the page
   css/styles.css        design tokens + layout
   js/config.js          ← the only file you normally edit
-  js/app.js             validation, custom selects, the n8n POST
+  js/app.js             pdf rendering, the form modal, the n8n POST
+  vendor/               pdf.js, served from our own origin (see below)
   img/                  logo variants + favicons (generated from the brand assets)
   files/                how-to-sell-your-used-cars-faster.pdf (the E-Book)
   favicon.ico
@@ -285,10 +288,34 @@ Two deliberate departures, both easy to undo:
 - **The phone field has a country selector** (defaulting to `+90`) instead of a fixed `+90` prefix,
   so international dealers can submit a usable number. n8n receives it normalised as `phoneE164`.
 
+### How the gate works
+
+The guide is rendered into the page with **pdf.js**, one `<canvas>` per page, and the whole viewer
+is blurred (`filter: blur(9px)`) under a dark veil while `<html>` carries the `gated` class. The
+form sits above it as a real modal: `role="dialog"`, `aria-modal`, a focus trap, and no dismiss
+affordance — it can only be passed by submitting. `html.gated` also locks page scrolling.
+
+On success the `gated` class is removed: the blur and veil animate away, scrolling is released, and
+a slim bar appears at the bottom with the thank-you and a Download PDF button.
+
+**Why pdf.js and not an `<iframe>`.** iOS Safari renders only the first page of a PDF in an iframe
+and will not scroll it, and mobile Chrome sometimes downloads the file instead of displaying it.
+For a lead magnet where most traffic is mobile, neither is acceptable.
+
+**Why pdf.js is vendored.** `new Worker()` cannot load a script from another origin, so pulling the
+worker from a CDN silently drops pdf.js onto the main thread — it still works, but rendering then
+blocks the UI. Serving both files from `public/vendor/` keeps the real worker and removes a
+third-party request. To upgrade, replace both files with a matching pair and keep
+`PDFJS_WORKER` in `config.js` pointing at the local worker.
+
+**If the guide cannot be rendered** — pdf.js missing, a corrupt file, a stalled network — the
+viewer falls back to the headline after `PDF_TIMEOUT_MS` (12s). The form keeps working either way;
+it never depends on the PDF.
+
 ### Behaviour worth knowing
 
-- **No JavaScript?** The selects fall back to styled native `<select>` elements and the page still
-  reads correctly. The submit needs JS.
+- **No JavaScript?** The form still renders with styled native `<select>` elements and the
+  headline stands in for the guide. Submitting needs JS.
 - **Touch devices** keep the native picker on purpose — the OS wheel/sheet beats any custom
   listbox on a phone. Desktop gets the custom dropdown from the screenshots.
 - **Keyboard** works throughout the custom select: arrows, Home/End, type-ahead, Enter, Escape.

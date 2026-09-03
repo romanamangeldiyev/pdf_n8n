@@ -1,7 +1,9 @@
 /* ==========================================================================
-   Car Studio — lead-magnet landing page
-   Design tokens taken from the brand guideline (Kurumsal Kimlik Kılavuzu 2023)
-   and the "Landing page" mock. Layout is a 1400px design canvas.
+   Car Studio — gated guide
+   The PDF fills the screen; the form sits on top of it as a modal and the
+   guide is blurred until the form is sent.
+   Tokens come from the brand guideline (Kurumsal Kimlik Kılavuzu 2023) and the
+   "Landing page" mock.
    ========================================================================== */
 
 :root {
@@ -9,19 +11,19 @@
   --brand:        #EC6D1C;   /* Car Studio Orange — brand guideline primary */
   --brand-hover:  #D65F12;
   --brand-active: #BE540F;
-  --brand-soft:   #FDF1E7;   /* orange @ ~8% on the page ground */
+  --brand-soft:   #FDF1E7;
   --brand-ring:   rgba(236, 109, 28, .28);
 
   /* Ink (from the landing mock) */
-  --ink:          #131A33;   /* headings */
-  --ink-2:        #5B6275;   /* body copy */
-  --muted:        #9BA1B4;   /* placeholders, meta */
+  --ink:          #131A33;
+  --ink-2:        #5B6275;
+  --muted:        #9BA1B4;
 
   /* Surfaces */
-  --bg:           #FFFCFA;   /* warm off-white page ground */
+  --bg:           #FFFCFA;
   --card:         #FFFFFF;
-  --line:         #E7E4E1;   /* hairlines on the page */
-  --field-line:   #E2E5EC;   /* input borders */
+  --line:         #E7E4E1;
+  --field-line:   #E2E5EC;
   --field-bg:     #FFFFFF;
 
   /* Feedback */
@@ -34,14 +36,16 @@
   --r-card:   22px;
   --r-field:  12px;
   --r-pill:   999px;
-  --shadow-card: 0 1px 2px rgba(19, 26, 51, .04),
-                 0 12px 32px -12px rgba(19, 26, 51, .10),
-                 0 32px 64px -32px rgba(19, 26, 51, .12);
-  --shadow-pop:  0 2px 6px rgba(19, 26, 51, .06),
-                 0 16px 40px -12px rgba(19, 26, 51, .18);
+  --shadow-modal: 0 2px 6px rgba(19, 26, 51, .06),
+                  0 24px 60px -16px rgba(19, 26, 51, .34),
+                  0 48px 90px -40px rgba(19, 26, 51, .40);
+  --shadow-pop:   0 2px 6px rgba(19, 26, 51, .06),
+                  0 16px 40px -12px rgba(19, 26, 51, .18);
 
   --font: "Montserrat", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
           Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  --header-h: 76px;
 }
 
 /* --------------------------------------------------------------- reset -- */
@@ -52,19 +56,21 @@ html { -webkit-text-size-adjust: 100%; }
 
 body {
   margin: 0;
-  background: var(--bg);
+  min-height: 100dvh;
+  background: #EEEAE6;          /* the gutter around the pages */
   color: var(--ink-2);
   font-family: var(--font);
   font-size: 16px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
 }
 
+/* No scrolling behind the gate. */
+html.gated, html.gated body { overflow: hidden; }
+
 h1, h2, h3, p, ol, ul, figure { margin: 0; }
-ol, ul { padding: 0; list-style: none; }
-img, svg { display: block; max-width: 100%; }
+img, svg, canvas { display: block; max-width: 100%; }
 button, input, select, textarea { font: inherit; color: inherit; }
 
 a { color: var(--brand); text-decoration-thickness: 1px; text-underline-offset: 2px; }
@@ -81,34 +87,96 @@ a:hover { color: var(--brand-hover); }
   overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
 }
 
-.skip-link {
-  position: absolute; left: 16px; top: -60px; z-index: 50;
-  background: var(--ink); color: #fff; padding: 10px 16px;
-  border-radius: 10px; font-size: 14px; font-weight: 600; text-decoration: none;
-  transition: top .15s ease;
+/* -------------------------------------------------------- the pdf ------- */
+
+.viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  padding: calc(var(--header-h) + 16px) 16px 48px;
+  /* Slightly oversized so the blur never shows a soft edge against the frame. */
+  transition: filter .5s ease, transform .5s ease;
 }
-.skip-link:focus { top: 16px; color: #fff; }
+html.gated .viewer {
+  filter: blur(9px);
+  transform: scale(1.03);
+  pointer-events: none;
+}
 
-/* ---------------------------------------------------------------- page -- */
-
-.page {
-  max-width: 1282px;              /* 1234px content + 2 × 24px gutter */
-  margin: 0 auto;
-  padding: 34px 24px 40px;
-  min-height: 100dvh;
+.viewer-pages {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  margin: 0 auto;
+  max-width: 900px;
 }
+
+.viewer-pages canvas {
+  width: 100%;
+  height: auto;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(19, 26, 51, .10), 0 10px 30px -14px rgba(19, 26, 51, .30);
+}
+
+/* Shown only if the PDF cannot be rendered — the form must still work. */
+.viewer-fallback {
+  display: grid;
+  place-content: center;
+  gap: 14px;
+  min-height: 60dvh;
+  text-align: center;
+  padding: 24px;
+}
+.viewer-fallback[hidden] { display: none; }
+.viewer-fallback span {
+  font-size: clamp(1.75rem, 1rem + 3vw, 3.25rem);
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -.022em;
+  color: var(--ink);
+}
+.viewer-fallback em {
+  font-style: normal;
+  font-size: clamp(1rem, .9rem + .4vw, 1.25rem);
+  color: var(--ink-2);
+}
+
+/* the dimming layer between the pdf and the modal */
+.veil {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(19, 26, 51, .30), rgba(19, 26, 51, .62));
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .5s ease;
+}
+html.gated .veil { opacity: 1; }
 
 /* -------------------------------------------------------------- header -- */
 
 .site-header {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 3;
+  height: var(--header-h);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  margin-bottom: clamp(32px, 4.4vw, 62px);
+  padding: 0 clamp(18px, 3vw, 34px);
+  background: linear-gradient(to bottom, rgba(255, 252, 250, .96), rgba(255, 252, 250, .80) 70%, rgba(255, 252, 250, 0));
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  pointer-events: none;                 /* let clicks reach the pdf */
 }
+.site-header > * { pointer-events: auto; }
 
 .logo { display: inline-flex; align-items: center; }
 .logo img { width: 138px; height: auto; }
@@ -118,112 +186,47 @@ a:hover { color: var(--brand-hover); }
   font-weight: 500;
   color: var(--muted);
   text-decoration: none;
-  letter-spacing: .01em;
   transition: color .15s ease;
 }
 .site-link:hover { color: var(--brand); }
 
-/* -------------------------------------------------------------- layout -- */
+/* --------------------------------------------------------------- modal -- */
 
-.layout {
-  flex: 1;
+.modal-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
   display: grid;
-  grid-template-columns: minmax(0, 660fr) minmax(0, 511fr);
-  column-gap: clamp(40px, 4.5vw, 63px);
-  align-items: start;
+  place-items: center;
+  padding: 20px 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
+.modal-layer[hidden] { display: none; }
+.modal-layer.is-leaving { animation: layer-out .32s ease forwards; }
 
-/* ---------------------------------------------------------------- left -- */
-
-.pitch { padding-top: 6px; max-width: 660px; }
-
-.badge {
-  display: inline-flex;
-  align-items: center;
-  height: 37px;
-  padding: 0 18px;
-  border-radius: var(--r-pill);
-  background: var(--brand-soft);
-  color: var(--brand);
-  font-size: 11.5px;
-  font-weight: 700;
-  letter-spacing: .16em;
-  line-height: 1;
-}
-
-.headline {
-  margin-top: 26px;
-  font-size: clamp(2.375rem, 1.15rem + 3.5vw, 3.75rem);  /* → 60px @1400 */
-  font-weight: 700;
-  line-height: 1.07;
-  letter-spacing: -.022em;
-  color: var(--ink);
-  text-wrap: balance;
-}
-
-.subhead {
-  margin-top: 22px;
-  max-width: 34em;
-  font-size: clamp(1rem, .93rem + .2vw, 1.125rem);       /* → 18px */
-  line-height: 1.62;
-  color: var(--ink-2);
-}
-
-.eyebrow {
-  margin-top: clamp(40px, 4vw, 56px);
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: .16em;
-  text-transform: uppercase;
-  color: var(--brand);
-}
-
-/* the five factors */
-
-.factors { margin-top: 8px; border-top: 1px solid var(--line); }
-
-.factor {
-  display: flex;
-  align-items: baseline;
-  gap: clamp(16px, 1.6vw, 22px);
-  min-height: 60px;
-  padding: 15px 2px;
-  border-bottom: 1px solid var(--line);
-}
-
-.factor-no {
-  flex: none;
-  min-width: 2.1ch;
-  font-size: 14px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: .04em;
-  color: var(--brand);
-}
-
-.factor-name {
-  font-size: clamp(1.125rem, .95rem + .55vw, 1.5rem);    /* → 24px */
-  font-weight: 600;
-  line-height: 1.25;
-  letter-spacing: -.012em;
-  color: var(--ink);
-}
-
-/* ---------------------------------------------------------------- card -- */
-
-.card {
-  position: relative;
+.modal {
+  width: 100%;
+  max-width: 511px;                     /* the card width from the mock */
+  margin: auto;
+  padding: clamp(24px, 2.6vw, 36px);
   background: var(--card);
-  border: 1px solid var(--line);
   border-radius: var(--r-card);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--shadow-modal);
+  animation: modal-in .34s cubic-bezier(.2, .8, .25, 1) both;
 }
 
-.card-body { padding: clamp(26px, 2.6vw, 38px); }
-.card-body[hidden] { display: none; }
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(14px) scale(.985); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes layer-out {
+  from { opacity: 1; }
+  to   { opacity: 0; transform: scale(.98); }
+}
 
 .card-title {
-  font-size: clamp(1.375rem, 1.1rem + .7vw, 1.75rem);    /* → 28px */
+  font-size: clamp(1.375rem, 1.1rem + .7vw, 1.75rem);
   font-weight: 700;
   line-height: 1.2;
   letter-spacing: -.018em;
@@ -251,7 +254,7 @@ a:hover { color: var(--brand-hover); }
 }
 .alert[hidden] { display: none; }
 
-/* --------------------------------------------------------------- form -- */
+/* ---------------------------------------------------------------- form -- */
 
 #lead-form { margin-top: 22px; }
 
@@ -273,8 +276,6 @@ a:hover { color: var(--brand-hover); }
 }
 
 .req { color: var(--brand); font-weight: 700; }
-
-/* text inputs + select trigger share one shell */
 
 .field input[type="text"],
 .field input[type="email"],
@@ -306,8 +307,6 @@ a:hover { color: var(--brand-hover); }
   box-shadow: 0 0 0 3px var(--brand-ring);
 }
 
-/* invalid state */
-
 .field.is-invalid input,
 .field.is-invalid .select-trigger,
 .field.is-invalid .select-wrap > select {
@@ -327,8 +326,6 @@ a:hover { color: var(--brand-hover); }
 }
 .err[hidden] { display: none; }
 
-/* phone: dial-code select + number input */
-
 .phone { display: flex; gap: 10px; align-items: flex-start; }
 .phone .select-dial { flex: 0 0 128px; }
 .phone > input { flex: 1 1 auto; min-width: 0; }
@@ -336,8 +333,6 @@ a:hover { color: var(--brand-hover); }
 /* The touch path shows the real <select>, whose text is the full "+90 Türkiye" —
    give it room so the country name is not cut off at the first letter. */
 .native-select .phone .select-dial { flex: 0 0 152px; }
-
-/* honeypot */
 
 .hp {
   position: absolute !important;
@@ -363,9 +358,8 @@ a:hover { color: var(--brand-hover); }
 }
 
 /* Once JS enhances the control, hide the native element but keep it in the
-   form — never display:none, so it still carries the value and stays
-   focusable/validatable. Touch devices (.native-select) skip enhancement and
-   keep the OS picker, which is the better control there. */
+   form. Touch devices (.native-select) skip enhancement and keep the OS
+   picker, which is the better control there. */
 .js:not(.native-select) .select-wrap:not(.is-native) > select {
   position: absolute;
   width: 1px; height: 1px; min-height: 0; padding: 0; margin: 0;
@@ -438,7 +432,7 @@ a:hover { color: var(--brand-hover); }
 }
 .select-option[aria-selected="true"] { font-weight: 600; }
 .select-option.is-active { background: #F4F4F5; }
-.select-option .opt-dial { color: var(--muted); margin-left: 6px; font-variant-numeric: tabular-nums; }
+.select-option .opt-dial { color: var(--muted); font-variant-numeric: tabular-nums; }
 
 /* ------------------------------------------------------------- button -- */
 
@@ -467,7 +461,6 @@ a:hover { color: var(--brand-hover); }
 .submit:hover  { background: var(--brand-hover); color: #fff; }
 .submit:active { background: var(--brand-active); transform: translateY(1px); }
 .submit:disabled { cursor: progress; opacity: .82; box-shadow: none; }
-.submit.as-link { margin-top: 26px; }
 
 .spinner {
   display: none;
@@ -490,78 +483,102 @@ a:hover { color: var(--brand-hover); }
 .fineprint a { color: var(--ink-2); text-decoration: underline; }
 .fineprint a:hover { color: var(--brand); }
 
-/* ------------------------------------------------------------ success -- */
+/* ------------------------------------------------------------ postbar -- */
 
-.success { text-align: center; }
-.success:focus { outline: none; }
-.success .card-sub { margin-inline: auto; max-width: 34em; }
+.postbar {
+  position: fixed;
+  z-index: 5;
+  left: 50%;
+  bottom: clamp(14px, 3vw, 26px);
+  transform: translateX(-50%);
+  width: min(720px, calc(100vw - 28px));
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 12px 12px 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, .94);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-pop);
+  animation: bar-in .4s .15s cubic-bezier(.2, .8, .25, 1) both;
+}
+.postbar[hidden] { display: none; }
 
-.success-mark {
-  width: 56px; height: 56px;
-  margin: 4px auto 18px;
-  display: grid;
-  place-items: center;
+@keyframes bar-in {
+  from { opacity: 0; transform: translate(-50%, 16px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.postbar-text {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--ink);
+}
+
+.postbar-tick {
+  flex: none;
+  width: 26px; height: 26px;
+  display: grid; place-items: center;
   border-radius: 50%;
   background: var(--success-soft);
   color: var(--success);
 }
-.success-mark svg { width: 26px; height: 26px; }
+.postbar-tick svg { width: 15px; height: 15px; }
 
-/* ------------------------------------------------------------- footer -- */
-
-.site-footer {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px 24px;
-  margin-top: clamp(40px, 5vw, 68px);
-  padding-top: 22px;
-  border-top: 1px solid var(--line);
-  font-size: 13px;
-  color: var(--muted);
+.postbar-btn {
+  flex: none;
+  padding: 11px 18px;
+  border-radius: 10px;
+  background: var(--brand);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
 }
-.site-footer nav { display: flex; flex-wrap: wrap; gap: 20px; }
-.site-footer a { color: var(--muted); text-decoration: none; }
-.site-footer a:hover { color: var(--brand); }
+.postbar-btn:hover { background: var(--brand-hover); color: #fff; }
+.postbar-btn[hidden] { display: none; }
+
+.postbar-close {
+  flex: none;
+  width: 34px; height: 34px;
+  display: grid; place-items: center;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.postbar-close:hover { background: #F4F4F5; color: var(--ink); }
+.postbar-close svg { width: 17px; height: 17px; }
 
 /* --------------------------------------------------------- responsive -- */
 
-@media (max-width: 1080px) {
-  .layout { grid-template-columns: minmax(0, 1fr) minmax(400px, 470px); }
-  .br-desktop { display: none; }
-}
-
-@media (max-width: 900px) {
-  .layout {
-    grid-template-columns: minmax(0, 1fr);
-    row-gap: 40px;
-    max-width: 620px;
-    margin-inline: auto;
-    width: 100%;
-  }
-  .pitch { max-width: none; }
-  .br-desktop { display: none; }
-  .factors { margin-top: 6px; }
-  .factor { min-height: 0; padding: 13px 2px; }
-}
-
-@media (max-width: 560px) {
-  .page { padding: 22px 18px 32px; }
-  .site-header { margin-bottom: 28px; }
-  .logo img { width: 120px; }
-  .headline { margin-top: 20px; }
-  .subhead { margin-top: 16px; }
+@media (max-width: 620px) {
+  :root { --header-h: 62px; }
+  .logo img { width: 118px; }
+  .viewer { padding-left: 10px; padding-right: 10px; }
+  .viewer-pages { gap: 12px; }
+  .modal-layer { padding: 14px 12px; }
+  .modal { padding: 22px 18px 24px; border-radius: 18px; }
   .row-2 { grid-template-columns: 1fr; gap: 16px; }
-  .row-2 .field + .field { margin-top: 0; }
   .phone .select-dial { flex-basis: 116px; }
-  .card-body { padding: 22px 18px 24px; }
   .submit { font-size: 17px; }
-  .site-footer { flex-direction: column; align-items: flex-start; }
+
+  .postbar { flex-wrap: wrap; gap: 10px; padding: 12px 14px; }
+  .postbar-text { flex-basis: 100%; font-size: 13.5px; }
+  .postbar-btn { flex: 1 1 auto; text-align: center; }
 }
 
 /* iOS zooms any input under 16px on focus — keep them at 16px. */
-@media (max-width: 560px) {
+@media (max-width: 620px) {
   .field input, .select-trigger, .select-option { font-size: 16px; }
 }
 
@@ -572,5 +589,5 @@ a:hover { color: var(--brand-hover); }
     transition-duration: .01ms !important;
     scroll-behavior: auto !important;
   }
-  .spinner { animation: none; border-top-color: rgba(255,255,255,.9); }
+  .spinner { animation: none; border-top-color: rgba(255, 255, 255, .9); }
 }
