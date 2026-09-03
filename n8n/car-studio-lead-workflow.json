@@ -120,9 +120,10 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseCode": 200,
         "responseBody": "={{ JSON.stringify({ ok: true }) }}",
-        "options": {}
+        "options": {
+          "responseCode": 200
+        }
       },
       "id": "a1b2c3d4-0005-4000-8000-000000000005",
       "name": "Respond 200",
@@ -137,9 +138,10 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseCode": 400,
         "responseBody": "={{ JSON.stringify({ ok: false, message: 'Some details are missing or invalid.', errors: $json.errors }) }}",
-        "options": {}
+        "options": {
+          "responseCode": 400
+        }
       },
       "id": "a1b2c3d4-0006-4000-8000-000000000006",
       "name": "Respond 400",
