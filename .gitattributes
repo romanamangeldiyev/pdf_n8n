@@ -1,0 +1,7 @@
+# Keep LF in the repository so the deployed files are byte-identical on every
+# machine. CNAME in particular must not pick up a CR.
+* text=auto eol=lf
+
+*.png  binary
+*.ico  binary
+*.pdf  binary
