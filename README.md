@@ -14,8 +14,7 @@ public/                 ← the only folder that gets published
   js/config.js          ← the only file you normally edit
   js/app.js             validation, custom selects, the n8n POST
   img/                  logo variants + favicons (generated from the brand assets)
-  files/                how-to-use-photo-editor.pdf (the E-Book)
-  CNAME                 custom domain for GitHub Pages
+  files/                how-to-sell-your-used-cars-faster.pdf (the E-Book)
   favicon.ico
 n8n/
   car-studio-lead-workflow.json   importable workflow: webhook → ClickUp "Inbound Leads"
@@ -32,7 +31,7 @@ Open [public/js/config.js](public/js/config.js) and set two values:
 
 ```js
 WEBHOOK_URL: 'https://n8n.carstudio.ai/webhook/car-studio-guide',
-EBOOK_URL:   'files/how-to-use-photo-editor.pdf',
+EBOOK_URL:   'files/how-to-sell-your-used-cars-faster.pdf',
 ```
 
 Use the **Production** URL. The `/webhook-test/` URL only accepts one request per
@@ -54,7 +53,7 @@ Form webhook → Normalise & validate → Valid lead? ─┬─ Build Inbound Le
 Then:
 
 1. **Webhook node → Options → Allowed Origins (CORS)**: enter the exact origin the page is served
-   from, e.g. `https://guide.carstudio.ai`. Use `*` only while testing. Without this the browser
+   from, e.g. `https://romanamangeldiyev.github.io`. Use `*` only while testing. Without this the browser
    blocks the request before n8n ever sees it — the single most common reason a page like this
    "does nothing" on submit.
 2. **Add a ClickUp credential** in n8n (*Credentials → New → ClickUp API*, personal token `pk_…`).
@@ -178,7 +177,7 @@ URL, so campaign attribution arrives with the lead.
 
 ## 3. Put the E-Book somewhere
 
-Already done: the guide sits at `public/files/how-to-use-photo-editor.pdf` (4.2 MB, 12 pages) and
+Already done: the guide sits at `public/files/how-to-sell-your-used-cars-faster.pdf` (468 KB, 8 pages) and
 `EBOOK_URL` points at it. If you swap the file, keep the name ASCII — no spaces, no Turkish
 characters — and update `EBOOK_URL` and `EBOOK_FILENAME` in [public/js/config.js](public/js/config.js).
 
@@ -215,30 +214,43 @@ git push -u origin main
 Then in the repo: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
 The first run takes a minute; after that every push redeploys.
 
-### Custom domain
+### Where it lands
 
-[public/CNAME](public/CNAME) is set to `guide.carstudio.ai` — change that one line if you want a
-different host. Then add the DNS record at your registrar:
+No custom domain: the site is served from the repository's own Pages URL,
 
-| Type | Name | Value |
-|---|---|---|
-| CNAME | `guide` | `<org>.github.io` |
+```
+https://romanamangeldiyev.github.io/pdf_n8n/
+```
 
-(An apex domain like `carstudio.ai` would need four `A` records to GitHub's IPs instead, but that
-host already serves the main site — a subdomain is the right call here.)
+Every path in the page is relative, so the `/pdf_n8n/` prefix costs nothing — CSS, JS, images and
+the PDF all resolve under it, and the E-Book stays same-origin so the download button really
+downloads.
 
-In **Settings → Pages** enter the same domain, wait for the DNS check to go green, then tick
-**Enforce HTTPS**. The certificate is issued automatically and can take a few minutes.
+### Adding a domain later
+
+Two steps, whenever you want one:
+
+1. Create `public/CNAME` containing the host on a single line, e.g. `guide.carstudio.ai`.
+2. Add a DNS record — `carstudio.ai` is on **Route 53**:
+   `CNAME` · name `guide` · value `romanamangeldiyev.github.io` (no repository name).
+
+Then put the same host in **Settings → Pages → Custom domain**, wait for the DNS check to go
+green and tick **Enforce HTTPS**. Update the n8n webhook's Allowed Origins to match, because the
+origin changes.
+
+An apex domain like `carstudio.ai` cannot work here — Pages takes the whole host, which would
+take down the main Vercel site. A path such as `carstudio.ai/guide` would need the page to live
+in the Next.js project, or a Vercel rewrite pointing at this Pages site.
 
 ### Then wire the two ends together
 
-1. **n8n → Form webhook → Allowed Origins**: `https://guide.carstudio.ai` — the exact final
-   origin, or the browser blocks every submission.
+1. **n8n → Form webhook → Allowed Origins**: `https://romanamangeldiyev.github.io` — the exact
+   origin (scheme + host, no path), or the browser blocks every submission.
 2. **n8n must be on HTTPS.** An `https://` page cannot POST to an `http://` webhook; the browser
    blocks it as mixed content.
 3. **`WEBHOOK_URL`** in [public/js/config.js](public/js/config.js) → the **Production** webhook URL.
-4. The E-Book is already at `public/files/how-to-use-photo-editor.pdf` and `EBOOK_URL` matches it.
-   If you swap the file, keep the name ASCII — no spaces, no Turkish characters.
+4. The E-Book is already at `public/files/how-to-sell-your-used-cars-faster.pdf` and `EBOOK_URL`
+   matches it. If you swap the file, keep the name ASCII — no spaces, no Turkish characters.
 
 Because the PDF is served from the same origin as the page, the download button really downloads
 instead of opening a tab. That only works while the file stays same-origin.

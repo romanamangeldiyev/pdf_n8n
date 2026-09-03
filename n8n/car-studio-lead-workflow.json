@@ -7,7 +7,7 @@
         "path": "car-studio-guide",
         "responseMode": "responseNode",
         "options": {
-          "allowedOrigins": "https://guide.carstudio.ai, http://localhost:3000",
+          "allowedOrigins": "https://romanamangeldiyev.github.io, http://localhost:3000",
           "rawBody": false
         }
       },

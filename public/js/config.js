@@ -22,11 +22,11 @@ window.CS_CONFIG = {
    * submit. Can be a same-origin file (e.g. 'files/car-studio-guide.pdf') or
    * any absolute URL. If n8n returns a `downloadUrl` in its response, that
    * value wins over this one. */
-  EBOOK_URL: 'files/how-to-use-photo-editor.pdf',
+  EBOOK_URL: 'files/how-to-sell-your-used-cars-faster.pdf',
 
   /* Filename suggested to the browser when the E-Book is same-origin.
    * Cross-origin URLs ignore the download attribute — the file opens instead. */
-  EBOOK_FILENAME: 'car-studio-how-to-use-photo-editor.pdf',
+  EBOOK_FILENAME: 'car-studio-how-to-sell-your-used-cars-faster.pdf',
 
   /* Give up on the request after this many milliseconds. */
   TIMEOUT_MS: 15000,
