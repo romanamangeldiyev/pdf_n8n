@@ -16,7 +16,7 @@ window.CS_CONFIG = {
    * Use the *Production* URL for the live site; the /webhook-test/ URL only
    * accepts one request per "Execute workflow" click in the editor.
    */
-  WEBHOOK_URL: 'https://YOUR-N8N-HOST/webhook/car-studio-guide',
+  WEBHOOK_URL: 'https://n8n.carstudio.ai/webhook/car-studio-guide',
 
   /* Where the E-Book lives. Shown as the download button after a successful
    * submit. Can be a same-origin file (e.g. 'files/car-studio-guide.pdf') or
