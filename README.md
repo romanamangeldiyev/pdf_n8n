@@ -34,7 +34,7 @@ Open [public/js/config.js](public/js/config.js) and set two values:
 
 ```js
 WEBHOOK_URL: 'https://n8n.carstudio.ai/webhook/car-studio-guide',
-EBOOK_URL:   'files/how-to-sell-your-used-cars-faster.pdf',
+EBOOK_URL:   'https://carstudio.ai/how-to-sell-your-used-cars-faster.pdf',
 ```
 
 Use the **Production** URL. The `/webhook-test/` URL only accepts one request per
@@ -173,20 +173,31 @@ URL, so campaign attribution arrives with the lead.
 
 | Response | Page behaviour |
 |---|---|
-| `200` + `{"ok":true}` ← what the workflow sends | success panel, download button uses `EBOOK_URL` |
-| `200` + empty body | success panel, download button uses `EBOOK_URL` |
+| `200` + `{"ok":true}` ← what the workflow sends | the browser goes to `EBOOK_URL` — the PDF opens |
+| `200` + empty body | the browser goes to `EBOOK_URL` — the PDF opens |
 | `200` + `{"ok":true,"downloadUrl":"…"}` | `EBOOK_URL` still wins; `downloadUrl` is used only when `EBOOK_URL` is empty |
 | `200` + `{"ok":false,"message":"…"}` | error banner, form stays filled in |
 | any `4xx` / `5xx`, timeout, or network failure | error banner, form stays filled in |
 
 ## 3. Put the E-Book somewhere
 
-Already done: the guide sits at `public/files/how-to-sell-your-used-cars-faster.pdf` (468 KB, 8 pages) and
-`EBOOK_URL` points at it. If you swap the file, keep the name ASCII — no spaces, no Turkish
-characters — and update `EBOOK_URL` and `EBOOK_FILENAME` in [public/js/config.js](public/js/config.js).
+The guide is published with the rest of the site, alongside the others:
 
-Keep it same-origin. A file served from the site downloads straight away; a cross-origin URL opens
-in a new tab instead, because browsers ignore the `download` attribute across origins.
+```
+https://carstudio.ai/how-to-sell-your-used-cars-faster.pdf
+```
+
+That file lives in the **Next.js project's `public/` folder**, not in this repo — the same place as
+`how-to-use-photo-editor.pdf`. Vercel serves it as `application/pdf` with `Content-Disposition:
+inline`, so it opens in the browser rather than landing in the downloads folder. `EBOOK_URL` in
+[public/js/config.js](public/js/config.js) is the address the visitor is sent to the moment the
+form goes through, so it has to be one that opens without a login.
+
+This repo still carries its own copy at `public/files/how-to-sell-your-used-cars-faster.pdf`
+(468 KB, 8 pages). That one is only the blurred teaser behind the form — `PREVIEW_URL` points at
+it, same-origin so it paints without waiting on another host. **Two copies means two things to
+update:** when the guide changes, replace the published file *and* this one. Keep the name ASCII —
+no spaces, no Turkish characters.
 
 ## 4. Run it
 
@@ -309,8 +320,21 @@ is blurred (`filter: blur(9px)`) under a dark veil while `<html>` carries the `g
 form sits above it as a real modal: `role="dialog"`, `aria-modal`, a focus trap, and no dismiss
 affordance — it can only be passed by submitting. `html.gated` also locks page scrolling.
 
-On success the `gated` class is removed: the blur and veil animate away, scrolling is released, and
-a slim bar appears at the bottom with the thank-you and a Download PDF button.
+**On success the browser goes to the PDF.** The form is the toll; the file itself is what the
+visitor asked for, so `unlockGuide()` sends them straight to `EBOOK_URL` in the same tab. A new tab
+would be the wrong tool: by the time the webhook has answered, the click is too far in the past for
+the browser to credit the window to it, and blockers stop it.
+
+The in-page viewer is what the visitor sees *behind* the form, blurred, while they fill it in — and
+it is the fallback if there is no file to go to (`EBOOK_URL` empty and no `downloadUrl` from the
+workflow). In that case the old behaviour stands: the blur lifts, scrolling is released, and a slim
+bar appears with the thank-you.
+
+> Two things follow from sending people to the raw PDF, and both are deliberate: the page rail and
+> the clickable button below are only ever seen through the blur, because the unblurred viewer is
+> no longer part of the journey. A PDF opened in the browser's own viewer carries no link
+> annotations, so the *Try it free* button in the file is not clickable. Point `EBOOK_URL` at
+> nothing to put the viewer back in the path.
 
 **Why pdf.js and not an `<iframe>`.** iOS Safari renders only the first page of a PDF in an iframe
 and will not scroll it, and mobile Chrome sometimes downloads the file instead of displaying it.

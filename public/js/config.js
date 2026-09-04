@@ -18,17 +18,20 @@ window.CS_CONFIG = {
    */
   WEBHOOK_URL: 'https://n8n.carstudio.ai/webhook/car-studio-guide',
 
-  /* Where the E-Book lives. Shown as the download button after a successful
-   * submit. Can be a same-origin file or any absolute URL. If n8n returns a
-   * `downloadUrl` in its response, that value wins over this one.
-   *
-   * Relative paths here resolve against the page, and the page sits one folder
-   * down (public/how-to-sell-your-used-cars-faster.pdf/), hence the '../'. */
-  EBOOK_URL: '../files/how-to-sell-your-used-cars-faster.pdf',
+  /* Where the visitor is sent the moment the form goes through. The guide is
+   * published with the rest of the site, next to the other ones
+   * (carstudio.ai/how-to-use-photo-editor.pdf), so this is an absolute URL and
+   * the file lives in the Next.js project's public/ folder — not in this repo.
+   * If n8n returns a `downloadUrl` in its response, this still wins; clear it
+   * to let the workflow hand out signed links instead. */
+  EBOOK_URL: 'https://carstudio.ai/how-to-sell-your-used-cars-faster.pdf',
 
-  /* Filename suggested to the browser when the E-Book is same-origin.
-   * Cross-origin URLs ignore the download attribute — the file opens instead. */
-  EBOOK_FILENAME: 'car-studio-how-to-sell-your-used-cars-faster.pdf',
+  /* The copy rendered behind the form, blurred, while it is filled in. Kept in
+   * this repo and same-origin, so the teaser paints without waiting on another
+   * host — update it whenever the published guide changes. A relative path
+   * resolves against the page, which sits one folder down, hence the '../'.
+   * Left empty, the viewer falls back to EBOOK_URL. */
+  PREVIEW_URL: '../files/how-to-sell-your-used-cars-faster.pdf',
 
   /* pdf.js worker. It MUST be same-origin: browsers refuse to construct a
    * Worker from another origin, and pdf.js then hangs instead of erroring —

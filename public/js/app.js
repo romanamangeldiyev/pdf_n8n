@@ -29,11 +29,6 @@
 
   /* ================================================================= urls == */
 
-  function isSameOrigin(url) {
-    try { return new URL(url, window.location.href).origin === window.location.origin; }
-    catch (e) { return false; }
-  }
-
   // Anything that ends up in an href or a fetch must be a real http(s) URL —
   // never javascript:, data: or anything exotic.
   function safeUrl(url) {
@@ -54,7 +49,9 @@
   }
 
   function renderPdf() {
-    var url = safeUrl(CFG.EBOOK_URL);
+    // The teaser renders from the copy in this repo; the published guide is on
+    // another host and is where the form sends people, not what it paints.
+    var url = safeUrl(CFG.PREVIEW_URL) || safeUrl(CFG.EBOOK_URL);
     var host = $('#viewer-pages');
     if (!host) return;
 
@@ -424,6 +421,28 @@
   });
 
   function unlockGuide(firstName, downloadUrl) {
+    // The guide the visitor was promised is the PDF, so the form hands them
+    // straight to it. Same-tab navigation, not a new window: a popup opened
+    // this long after the click — the webhook has answered in between — is not
+    // credited to the click any more, and blockers stop it.
+    //
+    // The PDF that ships with the page wins: it is known to exist and is
+    // same-origin. A URL handed back by the workflow is remote config that can
+    // drift out of date. Clear EBOOK_URL in config.js to let the workflow hand
+    // out signed links instead.
+    var pdf = safeUrl(CFG.EBOOK_URL) || safeUrl(downloadUrl) || '';
+    if (pdf) {
+      var label = $('.submit-label', submitBtn);
+      if (label) label.textContent = 'Opening the guide…';
+      pushLeadEvent();
+      // A beat, so an analytics tag has a chance to fire before we leave.
+      setTimeout(function () { window.location.href = pdf; }, 150);
+      return;
+    }
+
+    // No file to open — the workflow sent none and EBOOK_URL is empty. Fall
+    // back to reading it here, in the viewer the page has already rendered.
+
     // 1. the modal leaves
     modalLayer.classList.add('is-leaving');
     setTimeout(function () {
@@ -438,34 +457,19 @@
     var nameEl = $('#success-name');
     if (nameEl && firstName) nameEl.textContent = ', ' + firstName;
 
-    // The PDF that ships with the page wins: it is known to exist and is
-    // same-origin, so the download attribute actually works. A URL handed back
-    // by the workflow is remote config that can drift out of date, and if it is
-    // cross-origin the browser opens a tab instead of saving the file. Clear
-    // EBOOK_URL in config.js to let the workflow supply signed links instead.
+    // There is no file to hand over down here, so the bar carries the
+    // thank-you alone and the guide is read in the viewer behind it.
     var btn = $('#download-btn');
-    var href = safeUrl(CFG.EBOOK_URL) || safeUrl(downloadUrl) || '';
-    if (btn) {
-      if (href) {
-        btn.href = href;
-        if (isSameOrigin(href)) {
-          btn.setAttribute('download', CFG.EBOOK_FILENAME || '');
-          btn.removeAttribute('target');
-          btn.removeAttribute('rel');
-        } else {
-          btn.removeAttribute('download');
-          btn.target = '_blank';
-          btn.rel = 'noopener noreferrer';
-        }
-      } else {
-        btn.hidden = true;
-      }
-    }
+    if (btn) btn.hidden = true;
 
     postbar.hidden = false;
-    var focusTarget = (btn && !btn.hidden) ? btn : $('#postbar-close');
-    if (focusTarget) focusTarget.focus();
+    var close = $('#postbar-close');
+    if (close) close.focus();
 
+    pushLeadEvent();
+  }
+
+  function pushLeadEvent() {
     if (typeof window.dataLayer !== 'undefined' && window.dataLayer.push) {
       window.dataLayer.push({ event: 'generate_lead', form_id: 'car-studio-guide-v1' });
     }
