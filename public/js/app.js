@@ -46,7 +46,7 @@
 
   /* ================================================================== pdf == */
 
-  var pdfState = { doc: null, width: 0, rendering: false };
+  var pdfState = { doc: null, width: 0, rendering: false, pages: [], spy: null, active: 0 };
 
   function showPdfFallback() {
     var fb = $('#viewer-fallback');
@@ -84,13 +84,21 @@
     window.pdfjsLib.getDocument(url).promise
       .then(function (pdf) {
         pdfState.doc = pdf;
+        // Claim the rail's gutter before the pages are measured, so the first
+        // render already fits the width it will actually be given.
+        if (pdf.numPages > 1) root.classList.add('has-rail');
         return paintPages();
       })
-      .then(function () { settled = true; clearTimeout(deadline); })
+      .then(function () {
+        settled = true;
+        clearTimeout(deadline);
+        return buildThumbs();          // never rejects; the pages matter more
+      })
       .catch(function (err) {
         settled = true;
         clearTimeout(deadline);
         console.error('[car-studio] could not render the guide:', err);
+        root.classList.remove('has-rail');   // give the gutter back
         showPdfFallback();
       });
   }
@@ -98,16 +106,16 @@
   function paintPages() {
     var pdf = pdfState.doc;
     var host = $('#viewer-pages');
-    var viewer = $('#viewer');
     if (!pdf || !host || pdfState.rendering) return Promise.resolve();
 
     pdfState.rendering = true;
-    var cssWidth = Math.max(280, Math.min(900, (viewer.clientWidth || 900) - 32));
+    var cssWidth = pageWidth();
     pdfState.width = cssWidth;
     // Cap the pixel ratio: 3x on a phone triples memory for no visible gain.
     var dpr = Math.min(window.devicePixelRatio || 1, 2);
 
     host.textContent = '';
+    pdfState.pages = [];
     var fb = $('#viewer-fallback');
     if (fb) fb.hidden = true;
 
@@ -120,7 +128,17 @@
         console.error('[car-studio] page render failed:', err);
         if (!host.childNodes.length) showPdfFallback();
       })
-      .then(function () { pdfState.rendering = false; });
+      .then(function () {
+        pdfState.rendering = false;
+        watchPages();
+      });
+  }
+
+  // The pages box is what the canvases are sized against: the viewer's padding,
+  // and the rail's gutter with it, have already been taken out of it.
+  function pageWidth() {
+    var host = $('#viewer-pages');
+    return Math.max(280, Math.min(900, (host && host.clientWidth) || 900));
   }
 
   function paintOne(pageNo, cssWidth, dpr, host) {
@@ -130,20 +148,238 @@
         var scale = cssWidth / base.width;
         var viewport = page.getViewport({ scale: scale * dpr });
 
+        var wrap = doc.createElement('div');
+        wrap.className = 'pdf-page';
+        wrap.dataset.page = String(pageNo);
+
         var canvas = doc.createElement('canvas');
         canvas.width = Math.floor(viewport.width);
         canvas.height = Math.floor(viewport.height);
         canvas.style.aspectRatio = base.width + ' / ' + base.height;
         canvas.setAttribute('aria-hidden', 'true');
-        host.appendChild(canvas);
+
+        wrap.appendChild(canvas);
+        host.appendChild(wrap);
+        pdfState.pages.push(wrap);
 
         return page.render({
           canvasContext: canvas.getContext('2d', { alpha: false }),
           viewport: viewport
-        }).promise;
+        }).promise.then(function () {
+          return addPageLinks(page, viewport, wrap);
+        });
       });
     };
   }
+
+  /* ------------------------------------------------------------ hotspots -- */
+
+  /* The buttons in the guide are drawn artwork: the file carries no link
+   * annotations, so nothing on a page is clickable on its own. Find the button
+   * by its text and lay a transparent anchor over it. The anchor is positioned
+   * in percentages of the page, so it survives a resize without recomputing. */
+
+  function addPageLinks(page, viewport, wrap) {
+    var links = CFG.PDF_LINKS || [];
+    if (!links.length || !window.pdfjsLib.Util) return Promise.resolve();
+
+    return page.getTextContent().then(function (tc) {
+      var lines = groupLines(tc.items, viewport);
+      links.forEach(function (link) {
+        var url = safeUrl(link.url);
+        var needle = String(link.text || '').toLowerCase();
+        if (!url || !needle) return;
+        lines.forEach(function (line) {
+          if (line.text.toLowerCase().indexOf(needle) === -1) return;
+          wrap.appendChild(hotspot(line, link, url, viewport));
+        });
+      });
+    }).catch(function (err) {
+      // A page whose text layer will not load is still a page worth showing.
+      console.warn('[car-studio] could not place the links on a page:', err);
+    });
+  }
+
+  // pdf.js returns one item per run of text. Stitch the runs that share a
+  // baseline back into the line they were drawn as -- a button label is usually
+  // two or three of them ("Try it free, 3 credits included" and its arrow).
+  function groupLines(items, viewport) {
+    var lines = [];
+    var cur = null;
+
+    items.forEach(function (item) {
+      if (!item.str) return;
+      var m  = window.pdfjsLib.Util.transform(viewport.transform, item.transform);
+      var fs = Math.hypot(m[2], m[3]) || 1;        // font size, in canvas pixels
+      var x  = m[4], y = m[5];                     // start of the baseline
+      var w  = (item.width || 0) * viewport.scale;
+
+      var joins = cur &&
+                  Math.abs(y - cur.y) <= cur.fs * 0.3 &&    // same baseline
+                  x >= cur.left - cur.fs &&                 // and not a column
+                  x <= cur.right + cur.fs * 1.5;            // of its own
+
+      if (joins) {
+        cur.text += item.str;
+        cur.left  = Math.min(cur.left, x);
+        cur.right = Math.max(cur.right, x + w);
+        cur.fs    = Math.max(cur.fs, fs);
+      } else {
+        cur = { text: item.str, y: y, fs: fs, left: x, right: x + w };
+        lines.push(cur);
+      }
+    });
+
+    return lines;
+  }
+
+  function hotspot(line, link, url, viewport) {
+    var pad  = link.pad || {};
+    var padX = (pad.x      == null ? 2    : pad.x)      * line.fs;
+    var padT = (pad.top    == null ? 2.15 : pad.top)    * line.fs;
+    var padB = (pad.bottom == null ? 1.45 : pad.bottom) * line.fs;
+
+    var left   = Math.max(0, line.left - padX);
+    var right  = Math.min(viewport.width, line.right + padX);
+    var top    = Math.max(0, line.y - padT);
+    var bottom = Math.min(viewport.height, line.y + padB);
+
+    var a = doc.createElement('a');
+    a.className = 'pdf-link';
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.setAttribute('aria-label', link.label || line.text.trim());
+    a.style.left   = pct(left, viewport.width);
+    a.style.top    = pct(top, viewport.height);
+    a.style.width  = pct(right - left, viewport.width);
+    a.style.height = pct(bottom - top, viewport.height);
+    return a;
+  }
+
+  function pct(value, total) {
+    return (total ? (value / total) * 100 : 0).toFixed(4) + '%';
+  }
+
+  /* ---------------------------------------------------------------- rail -- */
+
+  /* Every page as a thumbnail down the left, so the guide can be skimmed and
+   * jumped through instead of only scrolled. */
+
+  function buildThumbs() {
+    var pdf  = pdfState.doc;
+    var rail = $('#rail');
+    var list = $('#rail-list');
+    if (!pdf || !rail || !list || pdf.numPages < 2) return Promise.resolve();
+
+    list.textContent = '';
+    var canvases = [];
+
+    for (var i = 1; i <= pdf.numPages; i++) {
+      var li = doc.createElement('li');
+      li.className = 'rail-item';
+
+      var btn = doc.createElement('button');
+      btn.type = 'button';
+      btn.className = 'rail-btn';
+      btn.dataset.page = String(i);
+      btn.setAttribute('aria-label', 'Page ' + i + ' of ' + pdf.numPages);
+
+      var canvas = doc.createElement('canvas');
+      canvas.setAttribute('aria-hidden', 'true');
+
+      var no = doc.createElement('span');
+      no.className = 'rail-no';
+      no.textContent = String(i);
+
+      btn.appendChild(canvas);
+      btn.appendChild(no);
+      li.appendChild(btn);
+      list.appendChild(li);
+      canvases.push(canvas);
+    }
+
+    // Show the rail straight away and fill the thumbnails in behind it, so how
+    // long the guide is reads immediately rather than after eight renders.
+    rail.hidden = false;
+    pdfState.active = 0;
+    markActive(1);
+    watchPages();
+
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var chain = Promise.resolve();
+    canvases.forEach(function (canvas, idx) {
+      chain = chain.then(function () { return paintThumb(idx + 1, canvas, dpr); });
+    });
+
+    return chain.catch(function (err) {
+      console.warn('[car-studio] the page thumbnails failed:', err);
+      rail.hidden = true;
+      root.classList.remove('has-rail');
+    });
+  }
+
+  function paintThumb(pageNo, canvas, dpr) {
+    return pdfState.doc.getPage(pageNo).then(function (page) {
+      var base = page.getViewport({ scale: 1 });
+      var viewport = page.getViewport({
+        scale: ((CFG.THUMBNAIL_WIDTH || 124) / base.width) * dpr
+      });
+      canvas.width = Math.floor(viewport.width);
+      canvas.height = Math.floor(viewport.height);
+      canvas.style.aspectRatio = base.width + ' / ' + base.height;
+      return page.render({
+        canvasContext: canvas.getContext('2d', { alpha: false }),
+        viewport: viewport
+      }).promise;
+    });
+  }
+
+  function markActive(pageNo) {
+    var list = $('#rail-list');
+    if (!list || pdfState.active === pageNo) return;
+    pdfState.active = pageNo;
+
+    $$('.rail-btn', list).forEach(function (btn) {
+      if (+btn.dataset.page !== pageNo) {
+        btn.removeAttribute('aria-current');
+        return;
+      }
+      btn.setAttribute('aria-current', 'true');
+      // Scrolls the rail's own overflow -- the viewer is not an ancestor of it.
+      try { btn.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (e) {}
+    });
+  }
+
+  // Mark whichever page fills most of the viewer as the one being read.
+  function watchPages() {
+    if (pdfState.spy) { pdfState.spy.disconnect(); pdfState.spy = null; }
+
+    var rail = $('#rail');
+    if (!rail || rail.hidden || !pdfState.pages.length) return;
+    if (!window.IntersectionObserver) { markActive(1); return; }
+
+    var seen = {};
+    pdfState.spy = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) { seen[en.target.dataset.page] = en.intersectionRatio; });
+
+      var best = 0, bestRatio = -1;
+      Object.keys(seen).forEach(function (p) {
+        if (seen[p] > bestRatio) { bestRatio = seen[p]; best = +p; }
+      });
+      if (best) markActive(best);
+    }, { root: $('#viewer'), threshold: [0, .1, .25, .5, .75, 1] });
+
+    pdfState.pages.forEach(function (page) { pdfState.spy.observe(page); });
+  }
+
+  var railList = $('#rail-list');
+  if (railList) railList.addEventListener('click', function (e) {
+    var btn = e.target.closest('.rail-btn');
+    if (!btn) return;
+    var page = pdfState.pages[+btn.dataset.page - 1];
+    if (page) page.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  });
 
   // Re-render when the width changes materially (rotation, window resize).
   var resizeTimer = null;
@@ -151,9 +387,7 @@
     if (!pdfState.doc) return;
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(function () {
-      var viewer = $('#viewer');
-      var next = Math.max(280, Math.min(900, (viewer.clientWidth || 900) - 32));
-      if (Math.abs(next - pdfState.width) > 40) paintPages();
+      if (Math.abs(pageWidth() - pdfState.width) > 40) paintPages();
     }, 250);
   });
 
@@ -199,12 +433,6 @@
 
     // 2. blur and veil lift, scrolling is released
     root.classList.remove('gated');
-
-    var pages = $('#viewer-pages');
-    if (pages) {
-      pages.setAttribute('aria-label',
-        'The guide, rendered as images. Use the Download PDF button to read it with a screen reader.');
-    }
 
     // 3. the confirmation bar takes over
     var nameEl = $('#success-name');

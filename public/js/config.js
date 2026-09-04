@@ -38,6 +38,31 @@ window.CS_CONFIG = {
    * empty frame. */
   PDF_TIMEOUT_MS: 12000,
 
+  /* Clickable areas laid over the rendered pages.
+   *
+   * The buttons in the guide are artwork: the PDF carries no link annotations,
+   * so nothing in it is clickable on its own. Each entry here is matched — case
+   * insensitively — against a line of text on every page, and a transparent
+   * link is placed over the line it finds.
+   *
+   * `pad` grows that text box out to the drawn button, in multiples of the
+   * line's own font size (x = both sides, top and bottom from the baseline).
+   * The defaults match the orange CTA on the last page; change them only if the
+   * artwork changes. `label` is what a screen reader announces. */
+  PDF_LINKS: [
+    {
+      text:  'Try it free',
+      url:   'https://app.carstudio.ai/en/register',
+      label: 'Try Car Studio free — 3 credits included',
+      pad:   { x: 2, top: 2.15, bottom: 1.45 }
+    }
+  ],
+
+  /* Width, in CSS pixels, that each page thumbnail in the left rail is drawn
+   * at. The rail shows them smaller than this on a phone, so a little headroom
+   * keeps them sharp. */
+  THUMBNAIL_WIDTH: 124,
+
   /* Give up on the request after this many milliseconds. */
   TIMEOUT_MS: 15000,
 

@@ -42,13 +42,22 @@
 
 <!-- The guide itself, rendered page by page. Blurred until the form is sent. -->
 <div class="viewer" id="viewer">
-  <div class="viewer-pages" id="viewer-pages" role="img"
-       aria-label="Preview of the guide, blurred until you request it"></div>
+  <p class="sr-only">
+    The guide is drawn into this page as images. Use the Download PDF button to read it
+    with a screen reader.
+  </p>
+  <div class="viewer-pages" id="viewer-pages"></div>
   <p class="viewer-fallback" id="viewer-fallback">
     <span>How to sell your used cars faster</span>
     <em>The five factors that decide whether a car sells</em>
   </p>
 </div>
+
+<!-- Every page of the guide as a thumbnail; filled in once the PDF has rendered. -->
+<nav class="rail" id="rail" aria-label="Pages of the guide" hidden>
+  <ol class="rail-list" id="rail-list"></ol>
+</nav>
+
 <div class="veil" id="veil" aria-hidden="true"></div>
 
 <header class="site-header">

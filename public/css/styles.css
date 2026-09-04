@@ -46,6 +46,8 @@
           Roboto, "Helvetica Neue", Arial, sans-serif;
 
   --header-h: 76px;
+  --rail-w:   150px;   /* the page thumbnails, down the left */
+  --rail-h:   96px;    /* ...and across the top, on a phone */
 }
 
 /* --------------------------------------------------------------- reset -- */
@@ -106,6 +108,9 @@ html.gated .viewer {
   pointer-events: none;
 }
 
+/* Once the rail is there, the pages give it its gutter. */
+html.has-rail .viewer { padding-left: calc(var(--rail-w) + 16px); }
+
 .viewer-pages {
   display: flex;
   flex-direction: column;
@@ -115,13 +120,100 @@ html.gated .viewer {
   max-width: 900px;
 }
 
-.viewer-pages canvas {
+.pdf-page {
+  position: relative;                  /* the hotspots hang off this */
+  width: 100%;
+  scroll-margin-top: calc(var(--header-h) + 12px);
+}
+
+.pdf-page canvas {
   width: 100%;
   height: auto;
   border-radius: 6px;
   background: #fff;
   box-shadow: 0 1px 2px rgba(19, 26, 51, .10), 0 10px 30px -14px rgba(19, 26, 51, .30);
 }
+
+/* A button drawn into the guide, made clickable. It sits exactly on top of the
+   artwork, so it stays invisible until you point at it. */
+.pdf-link {
+  position: absolute;
+  border-radius: 12px;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color .15s ease, box-shadow .15s ease;
+}
+.pdf-link:hover,
+.pdf-link:focus-visible {
+  background: rgba(255, 255, 255, .16);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, .55);
+  outline: none;
+}
+
+/* ---------------------------------------------------------------- rail --- */
+
+.rail {
+  position: fixed;
+  z-index: 0;                          /* under the veil, with the pages */
+  top: 0; left: 0; bottom: 0;
+  width: var(--rail-w);
+  padding: calc(var(--header-h) + 8px) 14px 24px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* A full-width scrollbar would eat an eighth of the rail and read as a
+     stripe through the blur while the guide is still gated. */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(19, 26, 51, .22) transparent;
+  background: rgba(255, 252, 250, .72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-right: 1px solid var(--line);
+  transition: filter .5s ease;
+}
+.rail[hidden] { display: none; }
+html.gated .rail { filter: blur(9px); pointer-events: none; }
+
+.rail-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rail-btn {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.rail-btn canvas {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1 / 1.414;             /* until the page reports its own */
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(19, 26, 51, .08), 0 4px 12px -8px rgba(19, 26, 51, .45);
+  transition: box-shadow .15s ease;
+}
+.rail-btn:hover canvas { box-shadow: 0 0 0 2px var(--brand-ring), 0 6px 14px -8px rgba(19, 26, 51, .5); }
+.rail-btn[aria-current="true"] canvas { box-shadow: 0 0 0 2px var(--brand), 0 6px 14px -8px rgba(19, 26, 51, .5); }
+
+.rail-no {
+  display: block;
+  margin-top: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  text-align: center;
+  color: var(--muted);
+}
+.rail-btn:hover .rail-no { color: var(--ink-2); }
+.rail-btn[aria-current="true"] .rail-no { color: var(--brand); }
 
 /* Shown only if the PDF cannot be rendered — the form must still work. */
 .viewer-fallback {
@@ -561,10 +653,34 @@ html.gated .veil { opacity: 1; }
 
 /* --------------------------------------------------------- responsive -- */
 
+@media (max-width: 900px) {
+  .rail {
+    right: 0; bottom: auto;
+    width: auto;
+    height: calc(var(--header-h) + var(--rail-h));
+    padding: calc(var(--header-h) - 4px) 12px 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .rail-list { flex-direction: row; gap: 8px; min-width: max-content; }
+  .rail-item { flex: 0 0 auto; width: 52px; }
+  .rail-no { margin-top: 3px; font-size: 11px; }
+
+  html.has-rail .viewer {
+    padding-left: 16px;
+    padding-top: calc(var(--header-h) + var(--rail-h) + 14px);
+  }
+  html.has-rail .pdf-page {
+    scroll-margin-top: calc(var(--header-h) + var(--rail-h) + 14px);
+  }
+}
+
 @media (max-width: 620px) {
   :root { --header-h: 62px; }
   .logo img { width: 118px; }
-  .viewer { padding-left: 10px; padding-right: 10px; }
+  .viewer, html.has-rail .viewer { padding-left: 10px; padding-right: 10px; }
   .viewer-pages { gap: 12px; }
   .modal-layer { padding: 14px 12px; }
   .modal { padding: 22px 18px 24px; border-radius: 18px; }

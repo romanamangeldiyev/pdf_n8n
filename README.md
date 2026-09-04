@@ -312,6 +312,40 @@ third-party request. To upgrade, replace both files with a matching pair and kee
 viewer falls back to the headline after `PDF_TIMEOUT_MS` (12s). The form keeps working either way;
 it never depends on the PDF.
 
+### The page rail
+
+Every page of the guide is drawn a second time as a thumbnail, in a rail down the left (a strip
+across the top under 900px wide). Clicking one scrolls the viewer to that page, and whichever page
+fills most of the screen is marked as you read. The rail only appears when the file has more than
+one page, and the pages give up the width it takes, so nothing sits underneath it.
+
+Thumbnails are drawn at `THUMBNAIL_WIDTH` (124 CSS px) in `config.js`. They render after the pages
+themselves, so a slow first paint is never made slower by them.
+
+### Clickable buttons in the guide
+
+The call to action on the last page is artwork — the PDF carries no link annotations, so nothing in
+it is clickable on its own. `PDF_LINKS` in [public/js/config.js](public/js/config.js) puts that
+right: each entry is matched, case insensitively, against a line of text on every page, and a
+transparent `<a>` is laid over the line it finds.
+
+```js
+PDF_LINKS: [
+  {
+    text:  'Try it free',                             // matched against the page
+    url:   'https://app.carstudio.ai/en/register',    // where the button goes
+    label: 'Try Car Studio free — 3 credits included',// what a screen reader says
+    pad:   { x: 2, top: 2.15, bottom: 1.45 }          // text box → drawn button
+  }
+]
+```
+
+`pad` grows the text's own box out to the edges of the drawn button, in multiples of that line's
+font size: `x` on both sides, `top` and `bottom` measured from the baseline. The defaults match the
+orange button on page 8 — if you swap the PDF for artwork with a different button, these are the
+numbers to nudge. The link is positioned in percentages of the page, so it stays on the button at
+every window size, and it is inert while the guide is still gated.
+
 ### Behaviour worth knowing
 
 - **No JavaScript?** The form still renders with styled native `<select>` elements and the
