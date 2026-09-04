@@ -1,7 +1,7 @@
 name: Deploy to GitHub Pages
 
-# Publishes ONLY the public/ folder. assets/ (brand guideline, landing mock)
-# and n8n/ stay in the repo but never reach the web.
+# Publishes ONLY the public/ folder. Anything else in the repo — the brand
+# guideline and the landing mock in assets/, say — never reaches the web.
 
 on:
   push:

@@ -19,8 +19,6 @@ public/                 ← the only folder that gets published
   img/                  logo variants + favicons (generated from the brand assets)
   files/                how-to-sell-your-used-cars-faster.pdf (the E-Book)
   favicon.ico
-n8n/
-  car-studio-lead-workflow.json   importable workflow: webhook → ClickUp "Inbound Leads"
 .github/workflows/
   deploy.yml            publishes public/ to GitHub Pages on every push to main
 assets/                 source material — never published
@@ -42,8 +40,8 @@ Use the **Production** URL. The `/webhook-test/` URL only accepts one request pe
 
 ## 2. Set up n8n → ClickUp
 
-Import [n8n/car-studio-lead-workflow.json](n8n/car-studio-lead-workflow.json)
-(*Workflows → ⋯ → Import from File*). It gives you:
+The workflow behind the form lives in n8n itself — this repo holds only the page. It is one
+webhook that ends in a ClickUp row:
 
 ```
 Form webhook → Normalise & validate → Valid lead? ─┬─ Build Inbound Leads row
@@ -60,7 +58,7 @@ Then:
    blocks the request before n8n ever sees it — the single most common reason a page like this
    "does nothing" on submit.
 2. **Add a ClickUp credential** in n8n (*Credentials → New → ClickUp API*, personal token `pk_…`).
-   The HTTP Request node picks it up automatically, so no token is stored in the workflow file.
+   The HTTP Request node picks it up automatically, so no token ends up in an export.
 3. **Activate** the workflow.
 
 ### Where the rows land
@@ -200,7 +198,7 @@ python -m http.server 8000 --directory public
 ## 5. Deploy to GitHub Pages
 
 [.github/workflows/deploy.yml](.github/workflows/deploy.yml) publishes **only `public/`** on every
-push to `main`. `assets/` and `n8n/` stay in the repo but never reach the web.
+push to `main`. Anything outside `public/` stays in the repo but never reaches the web.
 
 > **Make the repo private.** `assets/` holds the brand guideline and the landing mock. Those are
 > not published by the workflow, but in a *public* repo anyone can still download them straight
