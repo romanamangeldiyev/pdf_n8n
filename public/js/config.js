@@ -57,7 +57,8 @@ window.CS_CONFIG = {
   PDF_LINKS: [
     {
       text:  'Try it free',
-      url:   'https://app.carstudio.ai/en/register',
+      url:   'https://app.carstudio.ai/en/register?utm_source=linkedin' +
+             '&utm_medium=social&utm_campaign=linkedinpost1',
       label: 'Try Car Studio free — 3 credits included',
       pad:   { x: 2, top: 2.15, bottom: 1.45 }
     }

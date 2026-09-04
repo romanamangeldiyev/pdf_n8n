@@ -360,12 +360,40 @@ one page, and the pages give up the width it takes, so nothing sits underneath i
 Thumbnails are drawn at `THUMBNAIL_WIDTH` (124 CSS px) in `config.js`. They render after the pages
 themselves, so a slow first paint is never made slower by them.
 
-### Clickable buttons in the guide
+### The call to action, in two places
 
-The call to action on the last page is artwork — the PDF carries no link annotations, so nothing in
-it is clickable on its own. `PDF_LINKS` in [public/js/config.js](public/js/config.js) puts that
-right: each entry is matched, case insensitively, against a line of text on every page, and a
-transparent `<a>` is laid over the line it finds.
+The *Try it free* button on the last page was drawn as artwork: the file came out of the designer's
+export with no link annotations at all, so nothing in it was clickable. It now carries a real one,
+and the page carries a matching overlay — both point at the same address, and both have to be
+updated together:
+
+```
+https://app.carstudio.ai/en/register?utm_source=linkedin&utm_medium=social&utm_campaign=linkedinpost1
+```
+
+**1. In the PDF** — this is the one that matters, since the form opens the file itself. The
+annotation was appended to the exported PDF, over the button's own rectangle, read out of the page's
+content stream: `x 72–381.3`, `y 709.21–765.84` in PDF user space on a 930 × 1315.5 page.
+**A re-export from the design tool loses it.** To put it back:
+
+```python
+import pymupdf                                    # pip install pymupdf
+doc  = pymupdf.open('public/files/how-to-sell-your-used-cars-faster.pdf')
+page = doc[7]                                     # the last of eight
+h    = page.rect.height                           # pymupdf counts y from the top
+rect = pymupdf.Rect(72, h - 765.84, 381.3, h - 709.21)
+assert all(rect.contains(r) for r in page.search_for('Try it free, 3 credits included'))
+page.insert_link({'kind': pymupdf.LINK_URI, 'from': rect, 'uri': URL})
+doc.save(..., incremental=True, encryption=pymupdf.PDF_ENCRYPT_KEEP)   # appends, ~600 bytes
+```
+
+The `assert` is the guard worth keeping: if the artwork moves, the label stops sitting inside the
+rectangle and you find out before shipping a link over empty space.
+
+**2. On the page**, for the viewer behind the form. `PDF_LINKS` in
+[public/js/config.js](public/js/config.js) does not read the annotation — it matches text: each
+entry is matched, case insensitively, against a line of text on every page, and a transparent `<a>`
+is laid over the line it finds.
 
 ```js
 PDF_LINKS: [
@@ -381,8 +409,8 @@ PDF_LINKS: [
 `pad` grows the text's own box out to the edges of the drawn button, in multiples of that line's
 font size: `x` on both sides, `top` and `bottom` measured from the baseline. The defaults match the
 orange button on page 8 — if you swap the PDF for artwork with a different button, these are the
-numbers to nudge. The link is positioned in percentages of the page, so it stays on the button at
-every window size, and it is inert while the guide is still gated.
+numbers to nudge, in both places. The link is positioned in percentages of the page, so it stays on
+the button at every window size, and it is inert while the guide is still gated.
 
 ### Behaviour worth knowing
 
