@@ -11,7 +11,9 @@ Plain HTML, CSS and JavaScript — no build step. The only dependency is pdf.js,
 
 ```
 public/                 ← the only folder that gets published
-  index.html            the page
+  how-to-sell-your-used-cars-faster.pdf/
+    index.html          the page — the folder name is what makes the URL end in .pdf
+  index.html            forwards the old address to the one above
   css/styles.css        design tokens + layout
   js/config.js          ← the only file you normally edit
   js/app.js             pdf rendering, the form modal, the n8n POST
@@ -218,15 +220,29 @@ The first run takes a minute; after that every push redeploys.
 
 ### Where it lands
 
-No custom domain: the site is served from the repository's own Pages URL,
+No custom domain: the site is served from the repository's own Pages URL, and the link to hand
+out is the one that ends in `.pdf`:
 
 ```
-https://romanamangeldiyev.github.io/pdf_n8n/
+https://romanamangeldiyev.github.io/pdf_n8n/how-to-sell-your-used-cars-faster.pdf
 ```
 
 Every path in the page is relative, so the `/pdf_n8n/` prefix costs nothing — CSS, JS, images and
 the PDF all resolve under it, and the E-Book stays same-origin so the download button really
 downloads.
+
+**Why that link works.** `how-to-sell-your-used-cars-faster.pdf` is a *folder*, not a file, and the
+page is the `index.html` inside it. A request without the trailing slash gets a `301` to the folder,
+which is served as HTML — the extension in the URL never reaches a `Content-Type` header. Naming an
+HTML *file* `.pdf` would not work: GitHub Pages types it from the extension and the browser would
+try to parse the page as a PDF.
+
+Two things follow from the page living one folder down, and both are already done:
+
+- every asset in `index.html` is reached with `../`, and so are `EBOOK_URL` and `PDFJS_WORKER` in
+  `config.js` — those resolve against the page, not the site root;
+- `public/index.html` forwards the old address to the new one, carrying `?utm_…` and any fragment
+  with it, so links already in the wild keep working and keep their campaign tags.
 
 ### Adding a domain later
 

@@ -19,10 +19,12 @@ window.CS_CONFIG = {
   WEBHOOK_URL: 'https://n8n.carstudio.ai/webhook/car-studio-guide',
 
   /* Where the E-Book lives. Shown as the download button after a successful
-   * submit. Can be a same-origin file (e.g. 'files/car-studio-guide.pdf') or
-   * any absolute URL. If n8n returns a `downloadUrl` in its response, that
-   * value wins over this one. */
-  EBOOK_URL: 'files/how-to-sell-your-used-cars-faster.pdf',
+   * submit. Can be a same-origin file or any absolute URL. If n8n returns a
+   * `downloadUrl` in its response, that value wins over this one.
+   *
+   * Relative paths here resolve against the page, and the page sits one folder
+   * down (public/how-to-sell-your-used-cars-faster.pdf/), hence the '../'. */
+  EBOOK_URL: '../files/how-to-sell-your-used-cars-faster.pdf',
 
   /* Filename suggested to the browser when the E-Book is same-origin.
    * Cross-origin URLs ignore the download attribute — the file opens instead. */
@@ -32,7 +34,7 @@ window.CS_CONFIG = {
    * Worker from another origin, and pdf.js then hangs instead of erroring —
    * which is why both files are vendored into public/vendor/ (v3.11.174)
    * rather than pulled from a CDN. Keep the two in the same version. */
-  PDFJS_WORKER: 'vendor/pdf.worker.min.js',
+  PDFJS_WORKER: '../vendor/pdf.worker.min.js',
 
   /* If the guide has not rendered by then, show the headline instead of an
    * empty frame. */
